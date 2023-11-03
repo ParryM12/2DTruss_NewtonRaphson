@@ -64,9 +64,12 @@ class Calculation:
         self.calc_param = calc_param
         self.number_of_elements = []
         self.element_matrices = []
-        self.k_glob = np.array([0], dtype=np.float64)
-        self.nodes = np.array([0], dtype=np.float64)
+        self.k_sys = np.array([0], dtype=np.float64)
+        self.nodes = []
         self.solution = {}
+        self.node_to_index = []
+        self.f_vec = []
+        self.displacements = []
 
     def return_solution(self):
         """
@@ -78,7 +81,7 @@ class Calculation:
 
     def assembly_system_matrix(self):
         """
-        Calculates element matrices for every section, assembly system
+       Assemble global system stiffness matrix
         :return:
         """
 
@@ -95,7 +98,7 @@ class Calculation:
         # indices i_g and j_g in the global mass/stiffness matrix
         for i in range(num_elem):
             dof_i = self.element_matrices[i]['DOFs']
-            k_i = self.element_matrices[i]['K']
+            k_i = self.element_matrices[i]['K_global']
             dof_i_len = len(dof_i)
             mesh1, mesh2 = np.meshgrid(range(dof_i_len), range(dof_i_len), indexing='ij')
             ii = mesh1.ravel()
@@ -106,40 +109,45 @@ class Calculation:
             max_dof_i = max(dof_i)
             num_dofs = max(num_dofs, max_dof_i)
 
-        # Create sparse matrices for K and M
-        k_glob = csr_array((k_g, (np.array(i_g) - 1, np.array(j_g) - 1)), shape=(num_dofs, num_dofs), dtype=np.float64)
-        dof_isnot_zero = list(range(k_glob.shape[0]))
-        # Assemble springs  and boundary conditions
-        # Assemble stiff boundary conditions
-        k_glob = delete_from_csr(k_glob, row_indices=[2, 5], col_indices=[2, 5])
-        dof_is_zero = [2, 5]
-        # Assemble elastic boundary conditions (springs), if spring stiffness = 1 a rigid bc is applied
-        if self.springs['base_phiy'] != 0:
-            k_glob[3, 3] += self.springs['base_phiy']
-        else:
-            k_glob = delete_from_csr(k_glob, row_indices=[3], col_indices=[3])
-            dof_is_zero.append(4)
-        # Assemble vector to reassemble boundary conditions
-        dof_is_zero.sort()
-        self.dof_isnot_zero = [item for item in dof_isnot_zero if item not in dof_is_zero]
-        # Return global stiffness and mass matrix
-        k_glob = round(0.5 * (k_glob + np.transpose(k_glob)), 3)
-        # Return as dense matrices if problem is small, else sparse
-        # TODO: Test at which number of dofs it is more efficient to use sparse matrices
-        if k_glob.shape[0] > 30000:
-            return k_glob
-        elif k_glob.shape[0] <= 30000:
-            return k_glob.todense()
+        # Create sparse matrix for K
+        k_sys = csr_array((k_g, (np.array(i_g), np.array(j_g))), shape=(num_dofs + 1, num_dofs + 1), dtype=np.float64)
 
-    def solve_system(self):
-        """
-        Solves the system of equations and returns the axial forces and node displacements.
-        :return:
-        """
-        # Solve the system of equations
+        # Assemble boundary conditions (supports/springs), if spring stiffness = 1 a rigid bc is applied
+        for support_id, support_values in self.supports.items():
+            try:
+                index_nodes = self.node_to_index[support_values['sup_node']]
+            except KeyError:
+                print(f"The support {support_id} with the coordinates {support_values['sup_node']} is not connected "
+                      f"to a truss element!")
+                break
+            if support_values['c_x'] != 1:
+                k_sys[index_nodes * 2, index_nodes * 2] += support_values['c_x']
+            elif support_values['c_x'] == 1:
+                k_sys[index_nodes * 2, :] = 0
+                k_sys[:, index_nodes * 2] = 0
+                k_sys[index_nodes * 2, index_nodes * 2] = 1
+            if support_values['c_y'] != 1:
+                k_sys[index_nodes * 2 + 1, index_nodes * 2 + 1] += support_values['c_y']
+            elif support_values['c_y'] == 1:
+                k_sys[index_nodes * 2 + 1, :] = 0
+                k_sys[:, index_nodes * 2 + 1] = 0
+                k_sys[index_nodes * 2 + 1, index_nodes * 2 + 1] = 1
+        # Return global stiffness matrix
+            return k_sys.todense()
 
     def start_calc(self):
         """Function to start the calculation."""
+        # Create global node list
+        for element in self.elements.values():
+            # Check and add nodes to the list if they are not already in it
+            if element['ele_node_i'] not in self.nodes:
+                self.nodes.append(element['ele_node_i'])
+            if element['ele_node_j'] not in self.nodes:
+                self.nodes.append(element['ele_node_j'])
+
+        # Create a mapping from node tuples to their index in the global_nodes_list
+        self.node_to_index = {node: index for index, node in enumerate(self.nodes)}
+
         # Calculate element stiffness matrices
         for ele_id, ele_values in self.elements.items():
             ele_id = int(ele_id)
@@ -150,35 +158,53 @@ class Calculation:
             ele_lin_coeff = ele_values['ele_lin_coeff']
             ele_quad_coeff = ele_values['ele_quad_coeff']
             ele_eps_f = ele_values['ele_eps_f']
-            self.nodes = np.append(self.nodes, [ele_node_i, ele_node_j])
+            # Find the global index for node_i and node_j
+            dofs = np.append([self.node_to_index[ele_node_i] * 2, self.node_to_index[ele_node_i] * 2 + 1],
+                             [self.node_to_index[ele_node_j] * 2, self.node_to_index[ele_node_j] * 2 + 1])
             element_k_local, element_k_global = Element(ele_node_i, ele_node_j,
                                                         ele_area, ele_e).calculate_element_matrices()
-            self.element_matrices.append({'DOFs': 0, 'K_local': element_k_local, 'K_global': element_k_global})
-        # Construct connectivity between local and global nodes
-            self.nodes = np.unique(self.nodes, axis=0)
+            self.element_matrices.append({'DOFs': dofs, 'K_local': element_k_local, 'K_global': element_k_global})
+
+    # Assemble global stiffness matrix
+        self.k_sys = self.assembly_system_matrix()
+
+    # Assemble global load vector
+        self.f_vec = np.zeros((self.k_sys.shape[0], 1))
+        for force_id, force_values in self.forces.items():
+            try:
+                index_nodes = self.node_to_index[force_values['force_node']]
+            except KeyError:
+                print(f"The force {force_id} with the coordinates {force_values['force_node']} is not connected "
+                      f"to a truss element!")
+                break
+            self.f_vec[index_nodes * 2] += force_values['f_x']
+            self.f_vec[index_nodes * 2 + 1] += force_values['f_y']
+
+    # Solve system of equations for global node displacements
+    self.displacements = np.linalg.solve(self.k_sys, self.f_vec)
 
 
 # Example for testing and debugging
 if __name__ == "__main__":
     elements = {0: {'ele_number': 0,
-                    'ele_node_i': [0, 4],
-                    'ele_node_j': [4, 4],
+                    'ele_node_i': (0, 4),
+                    'ele_node_j': (4, 4),
                     'ele_A': 2000,
                     'ele_E': 30000,
                     'ele_lin_coeff': 1,
                     'ele_quad_coeff': 0,
                     'ele_eps_f': 2.5e-3},
                 1: {'ele_number': 1,
-                    'ele_node_i': [0, 0],
-                    'ele_node_j': [4, 4],
+                    'ele_node_i': (0, 0),
+                    'ele_node_j': (4, 4),
                     'ele_A': 500,
                     'ele_E': 30000,
                     'ele_lin_coeff': 1,
                     'ele_quad_coeff': 200,
                     'ele_eps_f': 2.5e-3},
                 2: {'ele_number': 2,
-                    'ele_node_i': [4, 4],
-                    'ele_node_j': [5, 0],
+                    'ele_node_i': (4, 4),
+                    'ele_node_j': (5, 0),
                     'ele_A': 500,
                     'ele_E': 30000,
                     'ele_lin_coeff': 1,
@@ -187,21 +213,21 @@ if __name__ == "__main__":
                 }
 
     supports = {0: {'sup_number': 0,
-                    'sup_node': [0, 4],
+                    'sup_node': (0, 4),
                     'c_x': 1,
                     'c_y': 1},
                 1: {'sup_number': 1,
-                    'sup_node': [0, 0],
+                    'sup_node': (0, 0),
                     'c_x': 1,
                     'c_y': 1},
                 2: {'sup_number': 2,
-                    'sup_node': [5, 0],
+                    'sup_node': (5, 0),
                     'c_x': 1,
                     'c_y': 1}
                 }
 
     forces = {0: {'force_number': 0,
-                  'force_node': [4, 4],
+                  'force_node': (4, 4),
                   'f_x': 0,
                   'f_y': 1200}}
 
@@ -211,5 +237,5 @@ if __name__ == "__main__":
 
     calc = Calculation(elements, supports, forces, calc_param)
     calc.start_calc()
-    solution = calc.return_solution()
-    print(solution)
+    # solution = calc.return_solution()
+    # print(solution)
