@@ -1,8 +1,6 @@
 import numpy as np
 from typing import Dict
 from scipy.sparse import csr_array
-import math
-from functions.sparse import delete_from_csr
 
 
 class Element:
@@ -19,6 +17,7 @@ class Element:
         self.k_local = []
         self.k_global = []
         self.length = 0
+        self.transformation_matrix = []
 
     def calculate_element_matrices(self):
         """
@@ -40,16 +39,16 @@ class Element:
         ])
 
         # Transformation matrix
-        transformation_matrix = np.array([
+        self.transformation_matrix = np.array([
             [cos_theta, sin_theta, 0, 0],
             [-sin_theta, cos_theta, 0, 0],
             [0, 0, cos_theta, sin_theta],
             [0, 0, -sin_theta, cos_theta]
         ])
 
-        self.k_global = transformation_matrix @ self.k_local @ np.transpose(transformation_matrix)
+        self.k_global = self.transformation_matrix @ self.k_local @ np.transpose(self.transformation_matrix)
 
-        return self.k_local, self.k_global
+        return self.k_local, self.k_global, self.transformation_matrix
 
 
 class Calculation:
@@ -62,7 +61,6 @@ class Calculation:
         self.supports = supports
         self.forces = forces
         self.calc_param = calc_param
-        self.number_of_elements = []
         self.element_matrices = []
         self.k_sys = np.array([0], dtype=np.float64)
         self.nodes = []
@@ -70,6 +68,8 @@ class Calculation:
         self.node_to_index = []
         self.f_vec = []
         self.displacements = []
+        self.axial_forces = np.arange(0)
+        self.num_elem = []
 
     def return_solution(self):
         """
@@ -85,7 +85,7 @@ class Calculation:
         :return:
         """
 
-        num_elem = len(self.element_matrices)
+        self.num_elem = len(self.element_matrices)
         # Pre-allocate lists for sparse matrix data.
         # i_g and j_g are used to index the global matrices
         # k_g and m_g will contain the element matrices in vector format
@@ -96,7 +96,7 @@ class Calculation:
 
         # Convert the element stiffness and mass matrices to vector format (k_g and m_g) and define the corresponding
         # indices i_g and j_g in the global mass/stiffness matrix
-        for i in range(num_elem):
+        for i in range(self.num_elem):
             dof_i = self.element_matrices[i]['DOFs']
             k_i = self.element_matrices[i]['K_global']
             dof_i_len = len(dof_i)
@@ -132,8 +132,9 @@ class Calculation:
                 k_sys[index_nodes * 2 + 1, :] = 0
                 k_sys[:, index_nodes * 2 + 1] = 0
                 k_sys[index_nodes * 2 + 1, index_nodes * 2 + 1] = 1
+
         # Return global stiffness matrix
-            return k_sys.todense()
+        return k_sys.todense()
 
     def start_calc(self):
         """Function to start the calculation."""
@@ -161,14 +162,15 @@ class Calculation:
             # Find the global index for node_i and node_j
             dofs = np.append([self.node_to_index[ele_node_i] * 2, self.node_to_index[ele_node_i] * 2 + 1],
                              [self.node_to_index[ele_node_j] * 2, self.node_to_index[ele_node_j] * 2 + 1])
-            element_k_local, element_k_global = Element(ele_node_i, ele_node_j,
-                                                        ele_area, ele_e).calculate_element_matrices()
-            self.element_matrices.append({'DOFs': dofs, 'K_local': element_k_local, 'K_global': element_k_global})
+            element_k_local, element_k_global, element_transformation = Element(ele_node_i, ele_node_j, ele_area,
+                                                                                ele_e).calculate_element_matrices()
+            self.element_matrices.append({'DOFs': dofs, 'K_local': element_k_local, 'K_global': element_k_global,
+                                          'transformation_matrix': element_transformation})
 
-    # Assemble global stiffness matrix
+        # Assemble global stiffness matrix
         self.k_sys = self.assembly_system_matrix()
 
-    # Assemble global load vector
+        # Assemble global load vector
         self.f_vec = np.zeros((self.k_sys.shape[0], 1))
         for force_id, force_values in self.forces.items():
             try:
@@ -180,8 +182,18 @@ class Calculation:
             self.f_vec[index_nodes * 2] += force_values['f_x']
             self.f_vec[index_nodes * 2 + 1] += force_values['f_y']
 
-    # Solve system of equations for global node displacements
-    self.displacements = np.linalg.solve(self.k_sys, self.f_vec)
+        # Solve system of equations for global node displacements
+        self.displacements = np.linalg.solve(self.k_sys, self.f_vec)
+
+        # Calculate axial forces
+        for i in range(len(self.element_matrices)):
+            displacements_local = (np.transpose(self.element_matrices[i]['transformation_matrix'])
+                                   @ self.displacements[self.element_matrices[i]['DOFs']])
+            axial_force_i = self.element_matrices[i]['K_local'] @ displacements_local
+            self.axial_forces = np.append(self.axial_forces, axial_force_i[2])
+
+        # Return solution
+        self.solution = {'node_displacements': self.displacements, 'axial_foces': self.axial_forces}
 
 
 # Example for testing and debugging
@@ -236,6 +248,5 @@ if __name__ == "__main__":
                   'delta_f_max': 1}
 
     calc = Calculation(elements, supports, forces, calc_param)
-    calc.start_calc()
-    # solution = calc.return_solution()
-    # print(solution)
+    solution = calc.return_solution()
+    print(solution)
