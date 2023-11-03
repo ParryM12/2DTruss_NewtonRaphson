@@ -111,6 +111,7 @@ class Calculation:
 
         # Create sparse matrix for K
         k_sys = csr_array((k_g, (np.array(i_g), np.array(j_g))), shape=(num_dofs + 1, num_dofs + 1), dtype=np.float64)
+        k_sys = k_sys.toarray()
 
         # Assemble boundary conditions (supports/springs), if spring stiffness = 1 a rigid bc is applied
         for support_id, support_values in self.supports.items():
@@ -134,7 +135,7 @@ class Calculation:
                 k_sys[index_nodes * 2 + 1, index_nodes * 2 + 1] = 1
 
         # Return global stiffness matrix
-        return k_sys.todense()
+        return k_sys
 
     def start_calc(self):
         """Function to start the calculation."""
@@ -193,7 +194,7 @@ class Calculation:
             self.axial_forces = np.append(self.axial_forces, axial_force_i[2])
 
         # Return solution
-        self.solution = {'node_displacements': self.displacements, 'axial_foces': self.axial_forces}
+        self.solution = {'nodes': self.nodes, 'node_displacements': self.displacements, 'axial_foces': self.axial_forces}
 
 
 # Example for testing and debugging
