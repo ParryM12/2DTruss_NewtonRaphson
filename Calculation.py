@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Dict
 from scipy.sparse import csr_array
-
+from functions.NewtonRaphson import sigma
 
 class Element:
     """
@@ -48,7 +48,7 @@ class Element:
 
         self.k_global = self.transformation_matrix @ self.k_local @ np.transpose(self.transformation_matrix)
 
-        return self.k_local, self.k_global, self.transformation_matrix
+        return self.k_local, self.k_global, self.transformation_matrix, self.length
 
 
 class Calculation:
@@ -70,6 +70,7 @@ class Calculation:
         self.displacements = []
         self.axial_forces = np.arange(0)
         self.num_elem = []
+        self.displacements_local = []
 
     def return_solution(self):
         """
@@ -151,22 +152,28 @@ class Calculation:
         self.node_to_index = {node: index for index, node in enumerate(self.nodes)}
 
         # Calculate element stiffness matrices
+        ele_area = []
+        ele_e = []
+        ele_lin_coeff = []
+        ele_quad_coeff = []
+        ele_eps_f = []
         for ele_id, ele_values in self.elements.items():
             ele_id = int(ele_id)
-            ele_e = ele_values['ele_E'] * 10 ** 3  # unit conversion MPa -> kN/m²
-            ele_area = ele_values['ele_A'] * 10 ** -4  # unit conversion cm² -> m²
+            ele_e.append(ele_values['ele_E'] * 10 ** 3)  # unit conversion MPa -> kN/m²
+            ele_area.append(ele_values['ele_A'] * 10 ** -4)  # unit conversion cm² -> m²
             ele_node_i = ele_values['ele_node_i']
             ele_node_j = ele_values['ele_node_j']
-            ele_lin_coeff = ele_values['ele_lin_coeff']
-            ele_quad_coeff = ele_values['ele_quad_coeff']
-            ele_eps_f = ele_values['ele_eps_f']
+            ele_lin_coeff.append(ele_values['ele_lin_coeff'])
+            ele_quad_coeff.append(ele_values['ele_quad_coeff'])
+            ele_eps_f.append(ele_values['ele_eps_f'])
             # Find the global index for node_i and node_j
             dofs = np.append([self.node_to_index[ele_node_i] * 2, self.node_to_index[ele_node_i] * 2 + 1],
                              [self.node_to_index[ele_node_j] * 2, self.node_to_index[ele_node_j] * 2 + 1])
-            element_k_local, element_k_global, element_transformation = Element(ele_node_i, ele_node_j, ele_area,
-                                                                                ele_e).calculate_element_matrices()
+            element_k_local, element_k_global, element_transformation, length = Element(ele_node_i, ele_node_j,
+                                                                                        ele_area[ele_id],
+                                                                                        ele_e[ele_id]).calculate_element_matrices()
             self.element_matrices.append({'DOFs': dofs, 'K_local': element_k_local, 'K_global': element_k_global,
-                                          'transformation_matrix': element_transformation})
+                                          'transformation_matrix': element_transformation, 'length': length})
 
         # Assemble global stiffness matrix
         self.k_sys = self.assembly_system_matrix()
@@ -185,16 +192,30 @@ class Calculation:
 
         # Solve system of equations for global node displacements
         self.displacements = np.linalg.solve(self.k_sys, self.f_vec)
-
-        # Calculate axial forces
+        # Calculate axial forces and strain
+        strain = []
         for i in range(len(self.element_matrices)):
-            displacements_local = (np.transpose(self.element_matrices[i]['transformation_matrix'])
-                                   @ self.displacements[self.element_matrices[i]['DOFs']])
-            axial_force_i = self.element_matrices[i]['K_local'] @ displacements_local
+            self.displacements_local.append(np.transpose(self.element_matrices[i]['transformation_matrix'])
+                                            @ self.displacements[self.element_matrices[i]['DOFs']])
+            axial_force_i = self.element_matrices[i]['K_local'] @ self.displacements_local[i]
             self.axial_forces = np.append(self.axial_forces, axial_force_i[2])
+            strain.append((self.displacements_local[i][2] - self.displacements_local[i][0])
+                          / self.element_matrices[i]['length'])
+
+        # Newton-Raphson-Method for nonlinear stress-strain relationship
+        strain = np.array(strain).reshape(-1, 1)
+        ele_lin_coeff = np.array(ele_lin_coeff).reshape(-1, 1)
+        ele_quad_coeff = np.array(ele_quad_coeff).reshape(-1, 1)
+        ele_e = np.array(ele_e).reshape(-1, 1)
+        ele_area = np.array(ele_area).reshape(-1, 1)
+        ele_eps_f = np.array(ele_eps_f).reshape(-1, 1)
+        if self.calc_param['calc_method'] in 'NR' or 'modNR':
+            # Update axial forces and stiffness (stiffness is constant in the modified Newton-Raphson method)
+            axial_forces_cor = sigma(strain, ele_lin_coeff, ele_quad_coeff, ele_e, ele_eps_f) * ele_area
 
         # Return solution
-        self.solution = {'nodes': self.nodes, 'node_displacements': self.displacements, 'axial_foces': self.axial_forces}
+        self.solution = {'nodes': self.nodes, 'node_displacements': self.displacements,
+                         'axial_foces': self.axial_forces}
 
 
 # Example for testing and debugging
@@ -244,7 +265,7 @@ if __name__ == "__main__":
                   'f_x': 0,
                   'f_y': 1200}}
 
-    calc_param = {'calc_method': 'linear',
+    calc_param = {'calc_method': 'NR',
                   'number_of_iterations': 0,
                   'delta_f_max': 1}
 
