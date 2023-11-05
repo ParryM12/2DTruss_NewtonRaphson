@@ -3,6 +3,7 @@ from typing import Dict
 from scipy.sparse import csr_array
 from functions.NewtonRaphson import sigma
 
+
 class Element:
     """
     The "Element" class contains the element information (nodes, cross-section, material parameters) and calculates the\n
@@ -71,6 +72,8 @@ class Calculation:
         self.axial_forces = np.arange(0)
         self.num_elem = []
         self.displacements_local = []
+        self.displacements_cor_total = []
+        self.axial_forces_cor = []
 
     def return_solution(self):
         """
@@ -171,7 +174,8 @@ class Calculation:
                              [self.node_to_index[ele_node_j] * 2, self.node_to_index[ele_node_j] * 2 + 1])
             element_k_local, element_k_global, element_transformation, length = Element(ele_node_i, ele_node_j,
                                                                                         ele_area[ele_id],
-                                                                                        ele_e[ele_id]).calculate_element_matrices()
+                                                                                        ele_e[
+                                                                                            ele_id]).calculate_element_matrices()
             self.element_matrices.append({'DOFs': dofs, 'K_local': element_k_local, 'K_global': element_k_global,
                                           'transformation_matrix': element_transformation, 'length': length})
 
@@ -203,6 +207,7 @@ class Calculation:
                           / self.element_matrices[i]['length'])
 
         # Newton-Raphson-Method for nonlinear stress-strain relationship
+        displacements_cor = np.zeros((self.k_sys.shape[0], 1))
         strain = np.array(strain).reshape(-1, 1)
         ele_lin_coeff = np.array(ele_lin_coeff).reshape(-1, 1)
         ele_quad_coeff = np.array(ele_quad_coeff).reshape(-1, 1)
@@ -210,12 +215,62 @@ class Calculation:
         ele_area = np.array(ele_area).reshape(-1, 1)
         ele_eps_f = np.array(ele_eps_f).reshape(-1, 1)
         if self.calc_param['calc_method'] in 'NR' or 'modNR':
-            # Update axial forces and stiffness (stiffness is constant in the modified Newton-Raphson method)
-            axial_forces_cor = sigma(strain, ele_lin_coeff, ele_quad_coeff, ele_e, ele_eps_f) * ele_area
+            if self.calc_param['number_of_iterations'] < 1:
+                print('The number of iterations has to be ≥ 1. "number_of_iterations" is set to 1.')
+                self.calc_param['number_of_iterations'] = 1
+            for iter_number in range(1, self.calc_param['number_of_iterations'] + 1):
+                # Update axial forces and stiffness (stiffness is constant in the modified Newton-Raphson method)
+                axial_forces_cor = sigma(strain, ele_lin_coeff, ele_quad_coeff, ele_e, ele_eps_f) * ele_area
+
+                # Calculate mismatch in node equilibrium
+                f_vec_cor = np.zeros(self.f_vec.shape)
+                for i in range(len(self.element_matrices)):
+                    axial_forces_cor_glob = (self.element_matrices[i]['transformation_matrix'] @
+                                             np.array([-axial_forces_cor[i][0], 0, axial_forces_cor[i][0], 0]).reshape(
+                                                 4, 1))
+                    f_vec_cor[self.element_matrices[i]['DOFs']] += axial_forces_cor_glob
+                f_vec_mismatch = self.f_vec - f_vec_cor
+
+                # Calculate additional displacements
+                if self.calc_param['calc_method'] in 'NR':
+                    for i in range(len(self.element_matrices)):
+                        ele_e_cor = (ele_lin_coeff + 2 * ele_quad_coeff * strain) * ele_e
+                        element_k_local, element_k_global, element_transformation, length \
+                            = (Element(self.elements[i]['ele_node_i'], self.elements[i]['ele_node_j'],
+                                       ele_area[i], ele_e_cor[i]).calculate_element_matrices())
+                        self.element_matrices[i]['K_local'] = element_k_local
+
+                    # Assemble global stiffness matrix
+                    self.k_sys = self.assembly_system_matrix()
+
+                # Reduce load vector and check stop criterion
+                rows_to_zero = np.diag(self.k_sys) == 1
+                f_vec_mismatch[rows_to_zero] = 0
+                stop_criterion = self.calc_param['delta_f_max']
+                if max(abs(f_vec_mismatch)) <= stop_criterion:
+                    print(f'Stop criterion of Δf ≤ {stop_criterion} kN reached at iteration step {iter_number}!')
+                    break
+
+                # Calculate total displacement
+                displacements_cor = displacements_cor + np.linalg.solve(self.k_sys,f_vec_mismatch)
+                self.displacements_cor_total = self.displacements + displacements_cor
+
+                # Update strain and axial forces
+                for i in range(len(self.element_matrices)):
+                    self.displacements_local[i] = (np.transpose(self.element_matrices[i]['transformation_matrix'])
+                                                   @ self.displacements_cor_total[self.element_matrices[i]['DOFs']])
+                    strain[i] = ((self.displacements_local[i][2] - self.displacements_local[i][0])
+                                 / self.element_matrices[i]['length'])
+                    self.axial_forces_cor = sigma(strain, ele_lin_coeff, ele_quad_coeff, ele_e, ele_eps_f) * ele_area
+
+                if iter_number == self.calc_param['number_of_iterations']:
+                    print(f'Maximum number of {iter_number} iterations reached without meeting the stop criterion'
+                          f' Δf ≤ {stop_criterion} kN!')
 
         # Return solution
-        self.solution = {'nodes': self.nodes, 'node_displacements': self.displacements,
-                         'axial_foces': self.axial_forces}
+        self.solution = {'nodes': self.nodes, 'node_displacements_linear': self.displacements,
+                         'node_displacements_nonlinear': self.displacements_cor_total,
+                         'axial_forces_linear': self.axial_forces, 'axial_forces_nonlinear': self.axial_forces_cor}
 
 
 # Example for testing and debugging
@@ -265,10 +320,13 @@ if __name__ == "__main__":
                   'f_x': 0,
                   'f_y': 1200}}
 
-    calc_param = {'calc_method': 'NR',
-                  'number_of_iterations': 0,
+    calc_param = {'calc_method': 'modNR',
+                  'number_of_iterations': 12,
                   'delta_f_max': 1}
 
     calc = Calculation(elements, supports, forces, calc_param)
     solution = calc.return_solution()
-    print(solution)
+    print('The axial forces of the linear elastic calculation are:')
+    print(solution['axial_forces_linear'])
+    print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')
+    print(solution['axial_forces_nonlinear'].reshape(1, 3))
