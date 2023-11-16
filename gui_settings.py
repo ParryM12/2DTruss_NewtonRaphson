@@ -2,11 +2,16 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.font import BOLD, Font
 import zlib
+import ctypes
+
 
 class GUI_Settings:
     """
     Define constants and static methods
     """
+    # Define screen size
+    user32 = ctypes.windll.user32
+    screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
 
     # colors
     CANVAS_BORDER_COLOR = '#5F1010'  # Rosewood
@@ -20,8 +25,10 @@ class GUI_Settings:
     STANDARD_FONT_2 = ('Arial', 7)
     STANDARD_FONT_BUTTON = ('Arial', 10)
 
-
-
+    # Width of columns in frames
+    FRAME_WIDTH_COL1 = 170 * screensize[0] / 2560
+    FRAME_WIDTH_COL2 = 150 * screensize[0] / 2560
+    # WIDTH_ENTRY = 20
     # ICON as bytestring
     @staticmethod
     def return_icon_bytestring():

@@ -236,7 +236,7 @@ class Calculation:
                     for i in range(len(self.element_matrices)):
                         ele_e_cor = (ele_lin_coeff + 2 * ele_quad_coeff * strain) * ele_e
                         element_k_local, element_k_global, element_transformation, length \
-                            = (Element(self.elements[i]['ele_node_i'], self.elements[i]['ele_node_j'],
+                            = (Element(self.elements[str(i)]['ele_node_i'], self.elements[str(i)]['ele_node_j'],
                                        ele_area[i], ele_e_cor[i]).calculate_element_matrices())
                         self.element_matrices[i]['K_local'] = element_k_local
 
@@ -276,49 +276,49 @@ class Calculation:
 # Example for testing and debugging
 if __name__ == "__main__":
     elements = {0: {'ele_number': 0,
-                    'ele_node_i': (0, 4),
-                    'ele_node_j': (4, 4),
-                    'ele_A': 2000,
-                    'ele_E': 30000,
-                    'ele_lin_coeff': 1,
-                    'ele_quad_coeff': 0,
+                    'ele_node_i': (0., 4.),
+                    'ele_node_j': (4., 4.),
+                    'ele_A': 2000.,
+                    'ele_E': 30000.,
+                    'ele_lin_coeff': 1.,
+                    'ele_quad_coeff': 0.,
                     'ele_eps_f': 2.5e-3},
                 1: {'ele_number': 1,
-                    'ele_node_i': (0, 0),
-                    'ele_node_j': (4, 4),
-                    'ele_A': 500,
-                    'ele_E': 30000,
-                    'ele_lin_coeff': 1,
-                    'ele_quad_coeff': 200,
+                    'ele_node_i': (0., 0.),
+                    'ele_node_j': (4., 4.),
+                    'ele_A': 500.,
+                    'ele_E': 30000.,
+                    'ele_lin_coeff': 1.,
+                    'ele_quad_coeff': 200.,
                     'ele_eps_f': 2.5e-3},
                 2: {'ele_number': 2,
-                    'ele_node_i': (4, 4),
-                    'ele_node_j': (5, 0),
-                    'ele_A': 500,
-                    'ele_E': 30000,
-                    'ele_lin_coeff': 1,
-                    'ele_quad_coeff': 200,
+                    'ele_node_i': (4., 4.),
+                    'ele_node_j': (5., 0.),
+                    'ele_A': 500.,
+                    'ele_E': 30000.,
+                    'ele_lin_coeff': 1.,
+                    'ele_quad_coeff': 200.,
                     'ele_eps_f': 2.5e-3},
                 }
 
     supports = {0: {'sup_number': 0,
-                    'sup_node': (0, 4),
-                    'c_x': 1,
-                    'c_y': 1},
+                    'sup_node': (0., 4.),
+                    'c_x': 1.,
+                    'c_y': 1.},
                 1: {'sup_number': 1,
-                    'sup_node': (0, 0),
-                    'c_x': 1,
-                    'c_y': 1},
+                    'sup_node': (0., 0.),
+                    'c_x': 1.,
+                    'c_y': 1.},
                 2: {'sup_number': 2,
-                    'sup_node': (5, 0),
-                    'c_x': 1,
-                    'c_y': 1}
+                    'sup_node': (5., 0.),
+                    'c_x': 1.,
+                    'c_y': 1.}
                 }
 
     forces = {0: {'force_number': 0,
-                  'force_node': (4, 4),
-                  'f_x': 0,
-                  'f_y': 1200}}
+                  'force_node': (4., 4.),
+                  'f_x': 0.,
+                  'f_y': 1200.}}
 
     calc_param = {'calc_method': 'modNR',
                   'number_of_iterations': 12,

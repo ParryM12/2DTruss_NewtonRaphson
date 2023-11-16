@@ -1,10 +1,9 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter.font import Font
-from PIL import ImageTk
 from gui_settings import GUI_Settings
 import copy
 from tkinter import messagebox
+from calculation import Calculation
 
 #################################################
 # Other
@@ -55,15 +54,20 @@ class TrussAnalysisApp(tk.Tk):
         self.input_calc_param_init = {'calc_method': 'linear',
                                       'number_of_iterations': 0,
                                       'delta_f_max': 0.}
+        self.method_dict = {'Linear': 'linear',
+                            'Newton-Raphson': 'NR',
+                            'Mod. Newton-Raphson': 'modNR'}
         self.ele_number = 0
+        self.force_number = 0
+        self.support_number = 0
         self.input_elements = copy.deepcopy(self.input_elements_init)
         self.input_supports = copy.deepcopy(self.input_supports_init)
         self.input_forces = copy.deepcopy(self.input_forces_init)
         self.input_calc_param = copy.deepcopy(self.input_calc_param_init)
 
     def init_ui(self):
-        # Adjust the size to full screen
-        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}")
+        # Adjust the size to full screen self.winfo_screenwidth()
+        self.geometry(f"{GUI_Settings.screensize[0]}x{GUI_Settings.screensize[1]}")
         self.resizable(False, False)
 
         # Main frame for forms
@@ -85,8 +89,8 @@ class TrussAnalysisApp(tk.Tk):
         # Canvas for displaying results
         canvas_text = tk.Label(canvas_frame, text="System and results", font=GUI_Settings.FRAME_HEADER_FONT)
         canvas_text.place(relx=0.02, rely=0.014)
-        self.canvas = tk.Canvas(canvas_frame, width=self.winfo_screenwidth() * 0.7,
-                                height=self.winfo_screenheight() * 0.6,
+        self.canvas = tk.Canvas(canvas_frame, width=GUI_Settings.screensize[0] * 0.7,
+                                height=GUI_Settings.screensize[1] * 0.6,
                                 bg=GUI_Settings.CANVAS_BG, highlightbackground="black", highlightthickness=1)
         self.canvas.place(relx=0.02, rely=0.04)
         # self.canvas.pack(side="right", fill="both", expand=True, padx=50, pady=50)
@@ -106,8 +110,8 @@ class TrussAnalysisApp(tk.Tk):
                                                     font=GUI_Settings.FRAME_HEADER_FONT)
         current_system_information_label.place(relx=0.01, rely=0.7)
         initial_system_information = f"Information about the system parameters will be displayed here."
-        current_system_information = tk.Text(self, width=round(self.winfo_screenwidth() * 0.07),
-                                             height=round(self.winfo_screenheight() * 0.013), wrap=tk.WORD,
+        current_system_information = tk.Text(self, width=round(GUI_Settings.screensize[0] * 0.07),
+                                             height=round(GUI_Settings.screensize[1] * 0.013), wrap=tk.WORD,
                                              font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
         current_system_information.place(relx=0.01, rely=0.72)
         current_system_information.insert(tk.END, initial_system_information)
@@ -118,8 +122,8 @@ class TrussAnalysisApp(tk.Tk):
                                                  font=GUI_Settings.FRAME_HEADER_FONT)
         calculation_information_label.place(relx=0.4, rely=0.7)
         initial_calculation_information = f"Information about the calculation will be displayed here."
-        current_calculation_information = tk.Text(self, width=round(self.winfo_screenwidth() * 0.07),
-                                                  height=round(self.winfo_screenheight() * 0.013), wrap=tk.WORD,
+        current_calculation_information = tk.Text(self, width=round(GUI_Settings.screensize[0] * 0.07),
+                                                  height=round(GUI_Settings.screensize[1] * 0.013), wrap=tk.WORD,
                                                   font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
         current_calculation_information.place(relx=0.4, rely=0.72)
         current_calculation_information.insert(tk.END, initial_calculation_information)
@@ -131,38 +135,44 @@ class TrussAnalysisApp(tk.Tk):
         frame.pack(padx=10, pady=10, fill='x', anchor='nw')
 
         # Configure the column weights (0th column takes minimal required space, 1st column expands)
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=3)
+        # frame.columnconfigure(0, weight=1)
+        # frame.columnconfigure(1, weight=5)
+        frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
+        frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
 
         # Create Entry boxes and labels for element input parameters
         ttk.Label(frame, text="Node i (x, y) [m]:").grid(row=0, column=0, sticky='w')
         self.node_i_entry = ttk.Entry(frame)
-        self.node_i_entry.grid(row=0, column=1, sticky='e', padx=5)
+        self.node_i_entry.grid(row=0, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Node j (x, y) [m]:").grid(row=1, column=0, sticky='w')
         self.node_j_entry = ttk.Entry(frame)
-        self.node_j_entry.grid(row=1, column=1, sticky='e', padx=5)
+        self.node_j_entry.grid(row=1, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Cross-section area A [cm²]:").grid(row=2, column=0, sticky='w')
         self.area_entry = ttk.Entry(frame)
-        self.area_entry.grid(row=2, column=1, sticky='e', padx=5)
+        self.area_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Young's modulus E [MPa]:").grid(row=3, column=0, sticky='w')
         self.emod_entry = ttk.Entry(frame)
-        self.emod_entry.grid(row=3, column=1, sticky='e', padx=5)
+        self.emod_entry.grid(row=3, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Linear coefficient α [-]:").grid(row=4, column=0, sticky='w')
         self.lin_coeff_entry = ttk.Entry(frame)
-        self.lin_coeff_entry.grid(row=4, column=1, sticky='e', padx=5)
+        self.lin_coeff_entry.grid(row=4, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Quadratic coefficient β [-]:").grid(row=5, column=0, sticky='w')
         self.quad_coeff_entry = ttk.Entry(frame)
-        self.quad_coeff_entry.grid(row=5, column=1, sticky='e', padx=5)
+        self.quad_coeff_entry.grid(row=5, column=1, sticky='ew', padx=5)
+
+        ttk.Label(frame, text="Limit strain ε [-]:").grid(row=6, column=0, sticky='w')
+        self.strain_entry = ttk.Entry(frame)
+        self.strain_entry.grid(row=6, column=1, sticky='ew', padx=5)
 
         # Create Button to add the element
-        ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=6, columnspan=2, pady=10)
+        ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=7, columnspan=2, pady=10)
         # Create Button to edit an element
-        ttk.Button(frame, text="Edit Element", command=self.add_element).grid(row=7, columnspan=2, pady=0)
+        ttk.Button(frame, text="Edit Element", command=self.add_element).grid(row=8, columnspan=2, pady=0)
 
     def add_supports_form(self, parent_frame):
         # Create Frame
@@ -170,21 +180,23 @@ class TrussAnalysisApp(tk.Tk):
         frame.pack(padx=10, pady=10, fill='x', anchor='nw')
 
         # Configure the column weights (0th column takes minimal required space, 1st column expands)
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=3)
+        # frame.columnconfigure(0, weight=1)
+        # frame.columnconfigure(1, weight=5)
+        frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
+        frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
 
         # Create Entry boxes and labels for element input parameters
         ttk.Label(frame, text="Support Node (x, y) [m]:").grid(row=0, column=0, sticky='w')
         self.support_node_entry = ttk.Entry(frame)
-        self.support_node_entry.grid(row=0, column=1, sticky='e', padx=5)
+        self.support_node_entry.grid(row=0, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Stiffness c_x [kN/m]:").grid(row=1, column=0, sticky='w')
         self.stiffness_cx_entry = ttk.Entry(frame)
-        self.stiffness_cx_entry.grid(row=1, column=1, sticky='e', padx=5)
+        self.stiffness_cx_entry.grid(row=1, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Stiffness c_y [kN/m]:").grid(row=2, column=0, sticky='w')
         self.stiffness_cy_entry = ttk.Entry(frame)
-        self.stiffness_cy_entry.grid(row=2, column=1, sticky='e', padx=5)
+        self.stiffness_cy_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
         # Create Button to add the support
         ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=3, columnspan=2, pady=10)
@@ -197,22 +209,24 @@ class TrussAnalysisApp(tk.Tk):
         frame.pack(padx=10, pady=10, fill='x', anchor='nw')
 
         # Configure the column weights (0th column takes minimal required space, 1st column expands)
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=3)
+        # frame.columnconfigure(0, weight=1)
+        # frame.columnconfigure(1, weight=5)
+        frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
+        frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
 
         # Create Entry boxes and labels for element input parameters
         ttk.Label(frame, text="Force Node (x, y) [m]:").grid(row=0, column=0, sticky='w')
         self.force_node_entry = ttk.Entry(frame)
-        self.force_node_entry.grid(row=0, column=1, sticky='e', padx=5)
+        self.force_node_entry.grid(row=0, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Force F_x [kN]:").grid(row=1, column=0, sticky='w')
         self.force_x_entry = ttk.Entry(frame)
-        self.force_x_entry.grid(row=1, column=1, sticky='e', padx=5)
+        self.force_x_entry.grid(row=1, column=1, sticky='ew', padx=5)
         # self.force_x_entry.place(relx=0.9, rely=0.5)
 
         ttk.Label(frame, text="Force F_y [kN]:").grid(row=2, column=0, sticky='w')
         self.force_y_entry = ttk.Entry(frame)
-        self.force_y_entry.grid(row=2, column=1, sticky='e', padx=5)
+        self.force_y_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
         # Create Button to add the load
         ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, columnspan=2, pady=10)
@@ -225,19 +239,32 @@ class TrussAnalysisApp(tk.Tk):
         frame.pack(padx=10, pady=10, fill='x', anchor='nw')
 
         # Configure the column weights (0th column takes minimal required space, 1st column expands)
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=3)
+        # frame.columnconfigure(0, weight=1)
+        # frame.columnconfigure(1, weight=5)
+        frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
+        frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
+
+        # Dropdown menu options
+        methods = ["Linear", "Newton-Raphson", "Mod. Newton-Raphson"]
+
+        # Label for dropdown menu
+        ttk.Label(frame, text="Select method:").grid(row=0, column=0, sticky='w')
+
+        # Dropdown menu
+        self.method_combobox = ttk.Combobox(frame, values=methods, state="readonly")
+        self.method_combobox.grid(row=0, column=1, sticky='ew', padx=5)
+        self.method_combobox.current(0)  # Set default selection
 
         # Create Entry boxes and labels for element calculation parameters
         ttk.Label(frame, text="Max. number of iterations [-]:").grid(row=1, column=0, sticky='w')
         self.num_iterations_entry = ttk.Entry(frame)
-        self.num_iterations_entry.grid(row=1, column=1, sticky='e', padx=5)
+        self.num_iterations_entry.grid(row=1, column=1, sticky='ew', padx=5)
 
         ttk.Label(frame, text="Max. deviation F [kN]:").grid(row=2, column=0, sticky='w')
         self.delta_f_entry = ttk.Entry(frame)
-        self.delta_f_entry.grid(row=2, column=1, sticky='e', padx=5)
+        self.delta_f_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
-        ttk.Button(frame, text="Save Settings", command=self.add_load).grid(row=3, columnspan=2, pady=10)
+        ttk.Button(frame, text="Save Settings", command=self.calc_settings).grid(row=3, columnspan=2, pady=10)
 
     def add_element(self):
         try:
@@ -254,6 +281,7 @@ class TrussAnalysisApp(tk.Tk):
             emod = float(self.emod_entry.get())
             lin_coeff = float(self.lin_coeff_entry.get())
             quad_coeff = float(self.quad_coeff_entry.get())
+            strain_entry = float(self.strain_entry.get())
             # Add the new element to the input_elements dictionary
             self.input_elements[str(self.ele_number)] = {'ele_number': self.ele_number,
                                                          'ele_node_i': node_i,
@@ -261,8 +289,8 @@ class TrussAnalysisApp(tk.Tk):
                                                          'ele_A': area,
                                                          'ele_E': emod,
                                                          'ele_lin_coeff': lin_coeff,
-                                                         'ele_quad_coeff': quad_coeff
-                                                         }
+                                                         'ele_quad_coeff': quad_coeff,
+                                                         'ele_eps_f': strain_entry}
             # Increase unique element number
             self.ele_number += 1
         except Exception as e:
@@ -283,8 +311,15 @@ class TrussAnalysisApp(tk.Tk):
 
         force_x = float(self.force_x_entry.get())
         force_y = float(self.force_y_entry.get())
-        # Add the load to data structure
-        # ...
+        # Add the new load to the input_forces dictionary
+        self.input_forces[str(self.force_number)] = {'force_number': self.force_number,
+                                                     'force_node': force_node,
+                                                     'f_x': force_x,
+                                                     'f_y': force_y}
+        # Increase unique element number
+        self.force_number += 1
+
+        print(self.input_forces)
 
     def edit_load(self):
         pass
@@ -297,13 +332,37 @@ class TrussAnalysisApp(tk.Tk):
         if support_node is None:
             return
 
-        force_x = float(self.force_x_entry.get())
-        force_y = float(self.force_y_entry.get())
-        # Add the support to data structure
-        # ...
+        c_x = float(self.stiffness_cx_entry.get())
+        c_y = float(self.stiffness_cy_entry.get())
+        # Add the new load to the input_forces dictionary
+        self.input_supports[str(self.support_number)] = {'sup_number': self.support_number,
+                                                         'sup_node': support_node,
+                                                         'c_x': c_x,
+                                                         'c_y': c_y}
+        # Increase unique element number
+        self.support_number += 1
+
+        print(self.input_supports)
 
     def edit_support(self):
         pass
+
+    def calc_settings(self):
+        # Get settings from calc setting form
+        method = str(self.method_dict[self.method_combobox.get()])
+        try:
+            number_of_iterations = int(self.num_iterations_entry.get())
+        except ValueError as e:
+            # Show a warning message box
+            messagebox.showwarning("Warning", "Number of iterations must be an integer!")
+            return
+        delta_f = float(self.delta_f_entry.get())
+        # Add the new load to the input_forces dictionary
+        self.input_calc_param = {'calc_method': method,
+                                 'number_of_iterations': number_of_iterations,
+                                 'delta_f_max': delta_f}
+
+        print(self.input_calc_param)
 
     def parse_coordinates(self, coord_str: str) -> tuple[float, float]:
         # Removing common bracket types and spaces
@@ -318,9 +377,18 @@ class TrussAnalysisApp(tk.Tk):
             return None
 
     def run_calculation(self):
-        pass
-        # Gather data from the forms and run the calculations
-        # ...
+        input_parameters_calculation = [self.input_elements,
+                                        self.input_supports,
+                                        self.input_forces,
+                                        self.input_calc_param
+                                        ]
+        # calculation = Calculation(*input_parameters_calculation)
+        calculation = Calculation(self.input_elements, self.input_supports, self.input_forces, self.input_calc_param)
+        self.solution = calculation.return_solution()
+        print('The axial forces of the linear elastic calculation are:')
+        print(self.solution['axial_forces_linear'])
+        print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')
+        print(self.solution['axial_forces_nonlinear'].reshape(1, 3))
 
     def clear_all(self):
         pass
