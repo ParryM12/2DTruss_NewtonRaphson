@@ -1,52 +1,25 @@
 import tkinter as tk
+from tkinter import ttk
+from tkinter.font import BOLD, Font
 import zlib
-
 
 class GUI_Settings:
     """
     Define constants and static methods
     """
 
-    # FONTS
-    # STANDARD_FONT_1_BOLD = tkFont.Font(family="Arial", size=12, weight='bold')
-    # Main Window
-    MAIN_WINDOW_SIZE_X = 1200
-    MAIN_WINDOW_SIZE_Y = 800
-
-    # Geometry Window
-    GEOM_WINDOW_SIZE_X = 1200
-    GEOM_WINDOW_SIZE_Y = 800
-
-    # Standard Canvas Size
-    CANVAS_SIZE_X = 920  # Needs to be even!
-    CANVAS_SIZE_Y = 720  # Needs to be even!
-    GRID_SPACE = 10  # Needs to be divisor of GUIStatics.CANVAS_SIZE_X and GUIStatics.CANVAS_SIZE_Y
-    CANVAS_SCALE_FACTOR = 100
-
     # colors
     CANVAS_BORDER_COLOR = '#5F1010'  # Rosewood
-    CANVAS_BG = '#D2D2D2'  # Light gray
+    # CANVAS_BG = '#D2D2D2'  # Light gray
+    CANVAS_BG = 'white'  # Light gray
     CANVAS_COORD_COLOR = '#262626'  # Dark gray
     WINDOWS_SMALL_BG_COLOR = '#D2D2D2'  # Light gray
-    CANVAS_HIGHLIGHT_ELEMENT = '#5F1010'
-    # Fonts
-    STANDARD_FONT_BUTTON_SMALLER = ('Consolas', 8)
-    STANDARD_FONT_BUTTON_SMALL = ('Consolas', 9)
-    STANDARD_FONT_BUTTON_MID = ('Consolas', 10)
-    STANDARD_FONT_BUTTON_BIG = ('Consolas', 11)
-    STANDARD_FONT_BUTTON_BIG_BOLD = ('Arial Black', 11)
-    STANDARD_FONT_BUTTON_MID_BOLD = ('Arial Black', 10)
-    STANDARD_FONT_MID = ('Arial', 10)
-    STANDARD_FONT_BIG = ('Arial', 12)
-    STANDARD_FONT_BIGGER = ('Arial', 14)
-    STANDARD_FONT_MID_BOLD = ('Arial Black', 10)
-    STANDARD_FONT_BIG_BOLD = ('Arial Black', 12)
-    STANDARD_FONT_BIGGER_BOLD = ('Arial Black', 14)
-    STANDARD_FONT_SMALL = ('Arial', 9)
-    STANDARD_FONT_SMALLER = ('Arial', 8)
-    STANDARD_FONT_SMALLEST = ('Arial', 7)
-    STANDARD_FONT_SMALL_BOLD = ('Arial Black', 9)
-    SAVELOAD_FONT = ('Verdana', 10)
+    # Fonts/Styles
+    FRAME_HEADER_FONT = ('Arial', 12, 'bold')
+    STANDARD_FONT_1 = ('Arial', 12)
+    STANDARD_FONT_2 = ('Arial', 7)
+    STANDARD_FONT_BUTTON = ('Arial', 10)
+
 
 
     # ICON as bytestring
