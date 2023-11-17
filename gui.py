@@ -172,7 +172,7 @@ class TrussAnalysisApp(tk.Tk):
         # Create Button to add the element
         ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=7, columnspan=2, pady=10)
         # Create Button to edit an element
-        ttk.Button(frame, text="Edit Element", command=self.add_element).grid(row=8, columnspan=2, pady=0)
+        ttk.Button(frame, text="Edit/Delete Element", command=self.edit_element).grid(row=8, columnspan=2, pady=0)
 
     def add_supports_form(self, parent_frame):
         # Create Frame
@@ -201,7 +201,7 @@ class TrussAnalysisApp(tk.Tk):
         # Create Button to add the support
         ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=3, columnspan=2, pady=10)
         # Create Button to edit a support
-        ttk.Button(frame, text="Edit Support", command=self.edit_support).grid(row=4, columnspan=2, pady=0)
+        ttk.Button(frame, text="Edit/Delete Support", command=self.edit_support).grid(row=4, columnspan=2, pady=0)
 
     def add_loads_form(self, parent_frame):
         # Create Frame
@@ -231,7 +231,7 @@ class TrussAnalysisApp(tk.Tk):
         # Create Button to add the load
         ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, columnspan=2, pady=10)
         # Create Button to edit a load
-        ttk.Button(frame, text="Edit Load", command=self.add_element).grid(row=4, columnspan=2, pady=0)
+        ttk.Button(frame, text="Edit/Delete Load", command=self.add_element).grid(row=4, columnspan=2, pady=0)
 
     def calculation_settings_form(self, parent_frame):
         # Create Frame
@@ -282,6 +282,11 @@ class TrussAnalysisApp(tk.Tk):
             lin_coeff = float(self.lin_coeff_entry.get())
             quad_coeff = float(self.quad_coeff_entry.get())
             strain_entry = float(self.strain_entry.get())
+            # Check for duplicate element
+            for element in self.input_elements.values():
+                if element['ele_node_i'] == node_i and element['ele_node_j'] == node_j:
+                    messagebox.showerror("Duplicate Element", "An element with these nodes already exists!")
+                    return
             # Add the new element to the input_elements dictionary
             self.input_elements[str(self.ele_number)] = {'ele_number': self.ele_number,
                                                          'ele_node_i': node_i,
@@ -293,13 +298,154 @@ class TrussAnalysisApp(tk.Tk):
                                                          'ele_eps_f': strain_entry}
             # Increase unique element number
             self.ele_number += 1
+
+            # Clearing the entry boxes after adding the element
+            self.node_i_entry.delete(0, tk.END)
+            self.node_j_entry.delete(0, tk.END)
+            self.area_entry.delete(0, tk.END)
+            self.emod_entry.delete(0, tk.END)
+            self.lin_coeff_entry.delete(0, tk.END)
+            self.quad_coeff_entry.delete(0, tk.END)
+            self.strain_entry.delete(0, tk.END)
         except Exception as e:
             print(f"An error occured: {e}")
 
-        print(self.input_elements)
-
     def edit_element(self):
-        pass
+        self.edit_window = tk.Toplevel(self)
+        self.edit_window.title("Edit Element")
+
+        # Frame for entry boxes and labels
+        edit_frame = ttk.Frame(self.edit_window)
+        edit_frame.pack(padx=10, pady=10)
+
+        # Label for dropdown menu
+        ttk.Label(edit_frame, text="Select element:").grid(row=0, column=0, sticky='w')
+
+        # Dropdown for selecting the element to edit
+        self.element_dropdown = ttk.Combobox(edit_frame, state="readonly")
+        self.element_dropdown.grid(row=0, column=1, sticky='ew', padx=5, pady=10)
+        self.element_dropdown.bind("<<ComboboxSelected>>", self.populate_element_fields)
+
+        # Creating labeled entry boxes
+        ttk.Label(edit_frame, text="Node i (x, y) [m]:").grid(row=1, column=0, sticky='w')
+        self.edit_node_i_entry = ttk.Entry(edit_frame)
+        self.edit_node_i_entry.grid(row=1, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Node j (x, y) [m]:").grid(row=2, column=0, sticky='w')
+        self.edit_node_j_entry = ttk.Entry(edit_frame)
+        self.edit_node_j_entry.grid(row=2, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Cross-section area A [cm²]:").grid(row=3, column=0, sticky='w')
+        self.edit_area_entry = ttk.Entry(edit_frame)
+        self.edit_area_entry.grid(row=3, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Young's modulus E [MPa]:").grid(row=4, column=0, sticky='w')
+        self.edit_emod_entry = ttk.Entry(edit_frame)
+        self.edit_emod_entry.grid(row=4, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Linear coefficient α [-]:").grid(row=5, column=0, sticky='w')
+        self.edit_lin_coeff_entry = ttk.Entry(edit_frame)
+        self.edit_lin_coeff_entry.grid(row=5, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Quadratic coefficient β [-]:").grid(row=6, column=0, sticky='w')
+        self.edit_quad_coeff_entry = ttk.Entry(edit_frame)
+        self.edit_quad_coeff_entry.grid(row=6, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Limit strain ε [-]:").grid(row=7, column=0, sticky='w')
+        self.edit_strain_entry = ttk.Entry(edit_frame)
+        self.edit_strain_entry.grid(row=7, column=1, sticky='ew', padx=5)
+
+        # Button for saving changes
+        ttk.Button(edit_frame, text="Save Changes", command=self.save_element_changes).grid(row=8, column=1, padx=5,
+                                                                                            pady=10)
+        # Button for deleting the selected element
+        ttk.Button(edit_frame, text="Delete Element", command=self.delete_element).grid(row=8, column=0, padx=5)
+
+        # Initially populate the entry boxes with the current values of the first element
+        self.populate_element_fields()
+
+        # Call update_element_dropdown to initialize the combobox values
+        self.update_element_dropdown()
+
+    def populate_element_fields(self, event=None):
+        selected_index = self.element_dropdown.current()
+        element_id = list(self.input_elements.keys())[selected_index]
+        element = self.input_elements[element_id]
+
+        self.edit_node_i_entry.delete(0, tk.END)
+        self.edit_node_i_entry.insert(0, f"{element['ele_node_i'][0]}, {element['ele_node_i'][1]}")
+
+        self.edit_node_j_entry.delete(0, tk.END)
+        self.edit_node_j_entry.insert(0, f"{element['ele_node_j'][0]}, {element['ele_node_j'][1]}")
+
+        self.edit_area_entry.delete(0, tk.END)
+        self.edit_area_entry.insert(0, f"{element['ele_A']}")
+
+        self.edit_emod_entry.delete(0, tk.END)
+        self.edit_emod_entry.insert(0, f"{element['ele_E']}")
+
+        self.edit_lin_coeff_entry.delete(0, tk.END)
+        self.edit_lin_coeff_entry.insert(0, f"{element['ele_lin_coeff']}")
+
+        self.edit_quad_coeff_entry.delete(0, tk.END)
+        self.edit_quad_coeff_entry.insert(0, f"{element['ele_quad_coeff']}")
+
+        self.edit_strain_entry.delete(0, tk.END)
+        self.edit_strain_entry.insert(0, f"{element['ele_eps_f']}")
+
+    def save_element_changes(self):
+        selected_index = self.element_dropdown.current()
+        element_id = list(self.input_elements.keys())[selected_index]
+        # Parse values from entry boxes
+        node_i = self.parse_coordinates(self.edit_node_i_entry.get())
+        node_j = self.parse_coordinates(self.edit_node_j_entry.get())
+        area = float(self.edit_area_entry.get())
+        emod = float(self.edit_emod_entry.get())
+        lin_coeff = float(self.edit_lin_coeff_entry.get())
+        quad_coeff = float(self.edit_quad_coeff_entry.get())
+        strain_entry = float(self.edit_strain_entry.get())
+
+        # Update the element in the input_elements dictionary
+        self.input_elements[element_id] = {
+            'ele_number': int(element_id),
+            'ele_node_i': node_i,
+            'ele_node_j': node_j,
+            'ele_A': area,
+            'ele_E': emod,
+            'ele_lin_coeff': lin_coeff,
+            'ele_quad_coeff': quad_coeff,
+            'ele_eps_f': strain_entry}
+
+        self.edit_window.destroy()
+
+    def update_element_dropdown(self):
+        element_ids = list(self.input_elements.keys())
+        element_display_values = [f"Element {number}" for number in element_ids]
+
+        self.element_dropdown['values'] = element_display_values
+        if element_ids:
+            self.element_dropdown.current(0)
+        else:
+            self.element_dropdown.set('')
+
+        self.populate_element_fields()
+
+    def delete_element(self):
+        selected_index = self.element_dropdown.current()
+        if selected_index == -1:  # No selection
+            return
+
+        element_id = list(self.input_elements.keys())[selected_index]
+        del self.input_elements[element_id]
+        # Renumbering the remaining elements
+        new_input_elements = {}
+        for i, key in enumerate(sorted(self.input_elements.keys())):
+            new_input_elements[str(i)] = self.input_elements[key]
+
+        self.input_elements = new_input_elements
+
+        # Update the combobox options and entry fields
+        self.update_element_dropdown()
 
     def add_load(self):
         # Parse the coordinates from the entry fields
@@ -388,7 +534,7 @@ class TrussAnalysisApp(tk.Tk):
         print('The axial forces of the linear elastic calculation are:')
         print(self.solution['axial_forces_linear'])
         print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')
-        print(self.solution['axial_forces_nonlinear'].reshape(1, 3))
+        print(self.solution['axial_forces_nonlinear'])
 
     def clear_all(self):
         pass

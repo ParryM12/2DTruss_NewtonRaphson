@@ -214,7 +214,7 @@ class Calculation:
         ele_e = np.array(ele_e).reshape(-1, 1)
         ele_area = np.array(ele_area).reshape(-1, 1)
         ele_eps_f = np.array(ele_eps_f).reshape(-1, 1)
-        if self.calc_param['calc_method'] in 'NR' or 'modNR':
+        if self.calc_param['calc_method'] in 'NR' or 'modNR' and sum(ele_quad_coeff) != 0:
             if self.calc_param['number_of_iterations'] < 1:
                 print('The number of iterations has to be ≥ 1. "number_of_iterations" is set to 1.')
                 self.calc_param['number_of_iterations'] = 1
@@ -230,7 +230,6 @@ class Calculation:
                                                  4, 1))
                     f_vec_cor[self.element_matrices[i]['DOFs']] += axial_forces_cor_glob
                 f_vec_mismatch = self.f_vec - f_vec_cor
-
                 # Calculate additional displacements
                 if self.calc_param['calc_method'] in 'NR':
                     for i in range(len(self.element_matrices)):
@@ -238,8 +237,7 @@ class Calculation:
                         element_k_local, element_k_global, element_transformation, length \
                             = (Element(self.elements[str(i)]['ele_node_i'], self.elements[str(i)]['ele_node_j'],
                                        ele_area[i], ele_e_cor[i]).calculate_element_matrices())
-                        self.element_matrices[i]['K_local'] = element_k_local
-
+                        self.element_matrices[i]['K_global'] = element_k_global
                     # Assemble global stiffness matrix
                     self.k_sys = self.assembly_system_matrix()
 
@@ -252,7 +250,7 @@ class Calculation:
                     break
 
                 # Calculate total displacement
-                displacements_cor = displacements_cor + np.linalg.solve(self.k_sys,f_vec_mismatch)
+                displacements_cor = displacements_cor + np.linalg.solve(self.k_sys, f_vec_mismatch)
                 self.displacements_cor_total = self.displacements + displacements_cor
 
                 # Update strain and axial forces
@@ -266,62 +264,70 @@ class Calculation:
                 if iter_number == self.calc_param['number_of_iterations']:
                     print(f'Maximum number of {iter_number} iterations reached without meeting the stop criterion'
                           f' Δf ≤ {stop_criterion} kN!')
+        elif self.calc_param['calc_method'] in 'NR' or 'modNR' and sum(ele_quad_coeff) == 0:
+            self.axial_forces_cor = self.axial_forces
+            print(f'Attention: You selected a nonlinear Newton-Raphson calculation, '
+                  f'but you set the nonlinear parameter β of all elements to 0! Calculating linear...')
+        elif self.calc_param['calc_method'] in 'linear' and sum(ele_quad_coeff) != 0:
+            print(f'Attention: You selected a linear calculation, '
+                  f'but you set the nonlinear parameter β of at least one element not to 0! Calculating linear...')
 
         # Return solution
         self.solution = {'nodes': self.nodes, 'node_displacements_linear': self.displacements,
                          'node_displacements_nonlinear': self.displacements_cor_total,
-                         'axial_forces_linear': self.axial_forces, 'axial_forces_nonlinear': self.axial_forces_cor}
+                         'axial_forces_linear': np.round(self.axial_forces, 2),
+                         'axial_forces_nonlinear': np.round(self.axial_forces_cor, 2)}
 
 
 # Example for testing and debugging
 if __name__ == "__main__":
-    elements = {0: {'ele_number': 0,
-                    'ele_node_i': (0., 4.),
-                    'ele_node_j': (4., 4.),
-                    'ele_A': 2000.,
-                    'ele_E': 30000.,
-                    'ele_lin_coeff': 1.,
-                    'ele_quad_coeff': 0.,
-                    'ele_eps_f': 2.5e-3},
-                1: {'ele_number': 1,
-                    'ele_node_i': (0., 0.),
-                    'ele_node_j': (4., 4.),
-                    'ele_A': 500.,
-                    'ele_E': 30000.,
-                    'ele_lin_coeff': 1.,
-                    'ele_quad_coeff': 200.,
-                    'ele_eps_f': 2.5e-3},
-                2: {'ele_number': 2,
-                    'ele_node_i': (4., 4.),
-                    'ele_node_j': (5., 0.),
-                    'ele_A': 500.,
-                    'ele_E': 30000.,
-                    'ele_lin_coeff': 1.,
-                    'ele_quad_coeff': 200.,
-                    'ele_eps_f': 2.5e-3},
+    elements = {'0': {'ele_number': 0,
+                      'ele_node_i': (0., 4.),
+                      'ele_node_j': (4., 4.),
+                      'ele_A': 2000.,
+                      'ele_E': 30000.,
+                      'ele_lin_coeff': 1.,
+                      'ele_quad_coeff': 0.,
+                      'ele_eps_f': 2.5e-3},
+                '1': {'ele_number': 1,
+                      'ele_node_i': (0., 0.),
+                      'ele_node_j': (4., 4.),
+                      'ele_A': 500.,
+                      'ele_E': 30000.,
+                      'ele_lin_coeff': 1.,
+                      'ele_quad_coeff': 200.,
+                      'ele_eps_f': 2.5e-3},
+                '2': {'ele_number': 2,
+                      'ele_node_i': (4., 4.),
+                      'ele_node_j': (5., 0.),
+                      'ele_A': 500.,
+                      'ele_E': 30000.,
+                      'ele_lin_coeff': 1.,
+                      'ele_quad_coeff': 200.,
+                      'ele_eps_f': 2.5e-3},
                 }
 
-    supports = {0: {'sup_number': 0,
-                    'sup_node': (0., 4.),
-                    'c_x': 1.,
-                    'c_y': 1.},
-                1: {'sup_number': 1,
-                    'sup_node': (0., 0.),
-                    'c_x': 1.,
-                    'c_y': 1.},
-                2: {'sup_number': 2,
-                    'sup_node': (5., 0.),
-                    'c_x': 1.,
-                    'c_y': 1.}
+    supports = {'0': {'sup_number': 0,
+                      'sup_node': (0., 4.),
+                      'c_x': 1.,
+                      'c_y': 1.},
+                '1': {'sup_number': 1,
+                      'sup_node': (0., 0.),
+                      'c_x': 1.,
+                      'c_y': 1.},
+                '2': {'sup_number': 2,
+                      'sup_node': (5., 0.),
+                      'c_x': 1.,
+                      'c_y': 1.}
                 }
 
-    forces = {0: {'force_number': 0,
-                  'force_node': (4., 4.),
-                  'f_x': 0.,
-                  'f_y': 1200.}}
+    forces = {'0': {'force_number': 0,
+                    'force_node': (4., 4.),
+                    'f_x': 0.,
+                    'f_y': 1200.}}
 
-    calc_param = {'calc_method': 'modNR',
-                  'number_of_iterations': 12,
+    calc_param = {'calc_method': 'NR',
+                  'number_of_iterations': 2,
                   'delta_f_max': 1}
 
     calc = Calculation(elements, supports, forces, calc_param)
