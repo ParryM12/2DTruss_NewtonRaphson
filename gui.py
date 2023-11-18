@@ -231,7 +231,7 @@ class TrussAnalysisApp(tk.Tk):
         # Create Button to add the load
         ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, columnspan=2, pady=10)
         # Create Button to edit a load
-        ttk.Button(frame, text="Edit/Delete Load", command=self.add_element).grid(row=4, columnspan=2, pady=0)
+        ttk.Button(frame, text="Edit/Delete Load", command=self.edit_load).grid(row=4, columnspan=2, pady=0)
 
     def calculation_settings_form(self, parent_frame):
         # Create Frame
@@ -282,11 +282,14 @@ class TrussAnalysisApp(tk.Tk):
             lin_coeff = float(self.lin_coeff_entry.get())
             quad_coeff = float(self.quad_coeff_entry.get())
             strain_entry = float(self.strain_entry.get())
+
             # Check for duplicate element
-            for element in self.input_elements.values():
+            for key, element in self.input_elements.items():
                 if element['ele_node_i'] == node_i and element['ele_node_j'] == node_j:
-                    messagebox.showerror("Duplicate Element", "An element with these nodes already exists!")
+                    messagebox.showerror("Duplicate Element", "An element with these nodes already exists!"
+                                                              f"Consider editing element {key} instead!")
                     return
+
             # Add the new element to the input_elements dictionary
             self.input_elements[str(self.ele_number)] = {'ele_number': self.ele_number,
                                                          'ele_node_i': node_i,
@@ -308,7 +311,11 @@ class TrussAnalysisApp(tk.Tk):
             self.quad_coeff_entry.delete(0, tk.END)
             self.strain_entry.delete(0, tk.END)
         except Exception as e:
-            print(f"An error occured: {e}")
+            # Show a warning message box
+            messagebox.showerror("Error", f"An error occurred while adding the element: {e}")
+            print(f"An error occurred while adding the element: {e}")
+            return
+
 
     def edit_element(self):
         self.edit_window = tk.Toplevel(self)
@@ -448,50 +455,273 @@ class TrussAnalysisApp(tk.Tk):
         self.update_element_dropdown()
 
     def add_load(self):
-        # Parse the coordinates from the entry fields
-        force_node = self.parse_coordinates(self.force_node_entry.get())
+        try:
+            # Parse the coordinates from the entry fields
+            force_node = self.parse_coordinates(self.force_node_entry.get())
 
-        # Do not proceed further if the coordinates are invalid
-        if force_node is None:
-            return
+            # Do not proceed further if the coordinates are invalid
+            if force_node is None:
+                return
 
-        force_x = float(self.force_x_entry.get())
-        force_y = float(self.force_y_entry.get())
-        # Add the new load to the input_forces dictionary
-        self.input_forces[str(self.force_number)] = {'force_number': self.force_number,
-                                                     'force_node': force_node,
-                                                     'f_x': force_x,
-                                                     'f_y': force_y}
-        # Increase unique element number
-        self.force_number += 1
+            force_x = float(self.force_x_entry.get())
+            force_y = float(self.force_y_entry.get())
+            # Check for duplicate load
+            for key, force in self.input_forces.items():
+                if force['force_node'] == force_node:
+                    messagebox.showerror("Duplicate load", "A load at this node already exists!"
+                                                           f"Consider editing load {key} instead.")
+                    return
+            # Add the new load to the input_forces dictionary
+            self.input_forces[str(self.force_number)] = {'force_number': self.force_number,
+                                                         'force_node': force_node,
+                                                         'f_x': force_x,
+                                                         'f_y': force_y}
+            # Increase unique element number
+            self.force_number += 1
 
-        print(self.input_forces)
+            # Clearing the entry boxes after adding the load
+            self.force_node_entry.delete(0, tk.END)
+            self.force_x_entry.delete(0, tk.END)
+            self.force_y_entry.delete(0, tk.END)
+        except Exception as e:
+            print(f"An error occurred while adding the load: {e}")
 
     def edit_load(self):
-        pass
+        self.edit_window_load = tk.Toplevel(self)
+        self.edit_window_load.title("Edit Load")
 
-    def add_support(self):
-        # Parse the coordinates from the entry fields
-        support_node = self.parse_coordinates(self.support_node_entry.get())
+        # Frame for entry boxes and labels
+        edit_frame = ttk.Frame(self.edit_window_load)
+        edit_frame.pack(padx=10, pady=10)
 
-        # Do not proceed further if the coordinates are invalid
-        if support_node is None:
+        # Label for dropdown menu
+        ttk.Label(edit_frame, text="Select load:").grid(row=0, column=0, sticky='w')
+
+        # Dropdown for selecting the load to edit
+        self.load_dropdown = ttk.Combobox(edit_frame, state="readonly")
+        self.load_dropdown.grid(row=0, column=1, sticky='ew', padx=5, pady=10)
+        self.load_dropdown.bind("<<ComboboxSelected>>", self.populate_load_fields)
+
+        # Creating labeled entry boxes
+        ttk.Label(edit_frame, text="Force Node (x, y) [m]:").grid(row=1, column=0, sticky='w')
+        self.edit_force_node_entry = ttk.Entry(edit_frame)
+        self.edit_force_node_entry.grid(row=1, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Force F_x [kN]:").grid(row=2, column=0, sticky='w')
+        self.edit_force_x_entry = ttk.Entry(edit_frame)
+        self.edit_force_x_entry.grid(row=2, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Force F_y [kN]:").grid(row=3, column=0, sticky='w')
+        self.edit_force_y_entry = ttk.Entry(edit_frame)
+        self.edit_force_y_entry.grid(row=3, column=1, sticky='ew', padx=5)
+
+        # Button for saving changes
+        ttk.Button(edit_frame, text="Save Changes", command=self.save_load_changes).grid(row=4, column=1, padx=5,
+                                                                                         pady=10)
+        # Button for deleting the selected load
+        ttk.Button(edit_frame, text="Delete Load", command=self.delete_load).grid(row=4, column=0, padx=5)
+
+        # Initially populate the entry boxes with the current values of the first load
+        self.populate_load_fields()
+
+        # Call update_load_dropdown to initialize the combobox values
+        self.update_load_dropdown()
+
+    def populate_load_fields(self, event=None):
+        selected_index = self.load_dropdown.current()
+        force_id = list(self.input_forces.keys())[selected_index]
+        force = self.input_forces[force_id]
+
+        self.edit_force_node_entry.delete(0, tk.END)
+        self.edit_force_node_entry.insert(0, f"{force['force_node'][0]}, {force['force_node'][1]}")
+
+        self.edit_force_x_entry.delete(0, tk.END)
+        self.edit_force_x_entry.insert(0, f"{force['f_x']}")
+
+        self.edit_force_y_entry.delete(0, tk.END)
+        self.edit_force_y_entry.insert(0, f"{force['f_y']}")
+
+    def save_load_changes(self):
+        selected_index = self.load_dropdown.current()
+        force_id = list(self.input_forces.keys())[selected_index]
+        # Parse values from entry boxes
+        force_node = self.parse_coordinates(self.edit_force_node_entry.get())
+        f_x = float(self.edit_force_x_entry.get())
+        f_y = float(self.edit_force_y_entry.get())
+
+        # Update the load in the input_elements dictionary
+        self.input_forces[force_id] = {
+            'force_number': int(force_id),
+            'force_node': force_node,
+            'f_x': f_x,
+            'f_y': f_y}
+
+        self.edit_window_load.destroy()
+
+    def update_load_dropdown(self):
+        load_ids = list(self.input_forces.keys())
+        load_display_values = [f"Load {number}" for number in load_ids]
+
+        self.load_dropdown['values'] = load_display_values
+        if load_ids:
+            self.load_dropdown.current(0)
+        else:
+            self.load_dropdown.set('')
+
+        self.populate_load_fields()
+
+    def delete_load(self):
+        selected_index = self.load_dropdown.current()
+        if selected_index == -1:  # No selection
             return
 
-        c_x = float(self.stiffness_cx_entry.get())
-        c_y = float(self.stiffness_cy_entry.get())
-        # Add the new load to the input_forces dictionary
-        self.input_supports[str(self.support_number)] = {'sup_number': self.support_number,
-                                                         'sup_node': support_node,
-                                                         'c_x': c_x,
-                                                         'c_y': c_y}
-        # Increase unique element number
-        self.support_number += 1
+        load_id = list(self.input_forces.keys())[selected_index]
+        del self.input_forces[load_id]
+        # Renumbering the remaining loads
+        new_input_loads = {}
+        for i, key in enumerate(sorted(self.input_forces.keys())):
+            new_input_loads[str(i)] = self.input_forces[key]
 
-        print(self.input_supports)
+        self.input_forces = new_input_loads
+
+        # Update the combobox options and entry fields
+        self.update_load_dropdown()
+
+    def add_support(self):
+        try:
+            # Parse the coordinates from the entry fields
+            support_node = self.parse_coordinates(self.support_node_entry.get())
+
+            # Do not proceed further if the coordinates are invalid
+            if support_node is None:
+                return
+
+            c_x = float(self.stiffness_cx_entry.get())
+            c_y = float(self.stiffness_cy_entry.get())
+
+            # Check for duplicate element
+            for key, support in self.input_supports.items():
+                if support['sup_node'] == support_node:
+                    messagebox.showerror("Duplicate Support", "A support with this node already exists!"
+                                                              f"Consider editing support {key} instead!")
+                    return
+
+            # Add the new support to the input_supports dictionary
+            self.input_supports[str(self.support_number)] = {'sup_number': self.support_number,
+                                                             'sup_node': support_node,
+                                                             'c_x': c_x,
+                                                             'c_y': c_y}
+            # Increase unique element number
+            self.support_number += 1
+
+            # Clearing the entry boxes after adding the support
+            self.support_node_entry.delete(0, tk.END)
+            self.stiffness_cx_entry.delete(0, tk.END)
+            self.stiffness_cy_entry.delete(0, tk.END)
+
+        except Exception as e:
+            print(f"An error occurred while adding the support: {e}")
 
     def edit_support(self):
-        pass
+        self.edit_window_support = tk.Toplevel(self)
+        self.edit_window_support.title("Edit Support")
+
+        # Frame for entry boxes and labels
+        edit_frame = ttk.Frame(self.edit_window_support)
+        edit_frame.pack(padx=10, pady=10)
+
+        # Label for dropdown menu
+        ttk.Label(edit_frame, text="Select support:").grid(row=0, column=0, sticky='w')
+
+        # Dropdown for selecting the support to edit
+        self.support_dropdown = ttk.Combobox(edit_frame, state="readonly")
+        self.support_dropdown.grid(row=0, column=1, sticky='ew', padx=5, pady=10)
+        self.support_dropdown.bind("<<ComboboxSelected>>", self.populate_support_fields)
+
+        # Creating labeled entry boxes
+        ttk.Label(edit_frame, text="Support Node (x, y) [m]:").grid(row=1, column=0, sticky='w')
+        self.edit_support_node_entry = ttk.Entry(edit_frame)
+        self.edit_support_node_entry.grid(row=1, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Stiffness c_x [kN/m]:").grid(row=2, column=0, sticky='w')
+        self.edit_stiffness_cx_entry = ttk.Entry(edit_frame)
+        self.edit_stiffness_cx_entry.grid(row=2, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Stiffness c_y [kN/m]:").grid(row=3, column=0, sticky='w')
+        self.edit_stiffness_cy_entry = ttk.Entry(edit_frame)
+        self.edit_stiffness_cy_entry.grid(row=3, column=1, sticky='ew', padx=5)
+
+        # Button for saving changes
+        ttk.Button(edit_frame, text="Save Changes", command=self.save_support_changes).grid(row=4, column=1, padx=5,
+                                                                                            pady=10)
+        # Button for deleting the selected support
+        ttk.Button(edit_frame, text="Delete Support", command=self.delete_support).grid(row=4, column=0, padx=5)
+
+        # Initially populate the entry boxes with the current values of the first support
+        self.populate_support_fields()
+
+        # Call update_support_dropdown to initialize the combobox values
+        self.update_support_dropdown()
+
+    def populate_support_fields(self, event=None):
+        selected_index = self.support_dropdown.current()
+        support_id = list(self.input_supports.keys())[selected_index]
+        support = self.input_supports[support_id]
+
+        self.edit_support_node_entry.delete(0, tk.END)
+        self.edit_support_node_entry.insert(0, f"{support['sup_node'][0]}, {support['sup_node'][1]}")
+
+        self.edit_stiffness_cx_entry.delete(0, tk.END)
+        self.edit_stiffness_cx_entry.insert(0, f"{support['c_x']}")
+
+        self.edit_stiffness_cy_entry.delete(0, tk.END)
+        self.edit_stiffness_cy_entry.insert(0, f"{support['c_y']}")
+
+    def save_support_changes(self):
+        selected_index = self.support_dropdown.current()
+        support_id = list(self.input_supports.keys())[selected_index]
+        # Parse values from entry boxes
+        support_node = self.parse_coordinates(self.edit_support_node_entry.get())
+        c_x = float(self.edit_stiffness_cx_entry.get())
+        c_y = float(self.edit_stiffness_cy_entry.get())
+
+        # Update the load in the input_elements dictionary
+        self.input_supports[support_id] = {
+            'sup_number': int(support_id),
+            'sup_node': support_node,
+            'c_x': c_x,
+            'c_y': c_y}
+
+        self.edit_window_support.destroy()
+
+    def update_support_dropdown(self):
+        support_ids = list(self.input_supports.keys())
+        support_display_values = [f"Support {number}" for number in support_ids]
+
+        self.support_dropdown['values'] = support_display_values
+        if support_ids:
+            self.support_dropdown.current(0)
+        else:
+            self.support_dropdown.set('')
+
+        self.populate_support_fields()
+
+    def delete_support(self):
+        selected_index = self.support_dropdown.current()
+        if selected_index == -1:  # No selection
+            return
+
+        support_id = list(self.input_supports.keys())[selected_index]
+        del self.input_supports[support_id]
+        # Renumbering the remaining supports
+        new_input_supports = {}
+        for i, key in enumerate(sorted(self.input_supports.keys())):
+            new_input_supports[str(i)] = self.input_supports[key]
+
+        self.input_supports = new_input_supports
+
+        # Update the combobox options and entry fields
+        self.update_support_dropdown()
 
     def calc_settings(self):
         # Get settings from calc setting form
@@ -507,8 +737,6 @@ class TrussAnalysisApp(tk.Tk):
         self.input_calc_param = {'calc_method': method,
                                  'number_of_iterations': number_of_iterations,
                                  'delta_f_max': delta_f}
-
-        print(self.input_calc_param)
 
     def parse_coordinates(self, coord_str: str) -> tuple[float, float]:
         # Removing common bracket types and spaces
