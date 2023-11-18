@@ -134,9 +134,7 @@ class TrussAnalysisApp(tk.Tk):
         frame = ttk.LabelFrame(parent_frame, text="Define elements")
         frame.pack(padx=10, pady=10, fill='x', anchor='nw')
 
-        # Configure the column weights (0th column takes minimal required space, 1st column expands)
-        # frame.columnconfigure(0, weight=1)
-        # frame.columnconfigure(1, weight=5)
+        # Configure the column width
         frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
         frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
 
@@ -179,9 +177,7 @@ class TrussAnalysisApp(tk.Tk):
         frame = ttk.LabelFrame(parent_frame, text="Define Supports")
         frame.pack(padx=10, pady=10, fill='x', anchor='nw')
 
-        # Configure the column weights (0th column takes minimal required space, 1st column expands)
-        # frame.columnconfigure(0, weight=1)
-        # frame.columnconfigure(1, weight=5)
+        # Configure the column width
         frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
         frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
 
@@ -208,9 +204,7 @@ class TrussAnalysisApp(tk.Tk):
         frame = ttk.LabelFrame(parent_frame, text="Define Loads")
         frame.pack(padx=10, pady=10, fill='x', anchor='nw')
 
-        # Configure the column weights (0th column takes minimal required space, 1st column expands)
-        # frame.columnconfigure(0, weight=1)
-        # frame.columnconfigure(1, weight=5)
+        # Configure the column width
         frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
         frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
 
@@ -238,9 +232,7 @@ class TrussAnalysisApp(tk.Tk):
         frame = ttk.LabelFrame(parent_frame, text="Calculation Settings")
         frame.pack(padx=10, pady=10, fill='x', anchor='nw')
 
-        # Configure the column weights (0th column takes minimal required space, 1st column expands)
-        # frame.columnconfigure(0, weight=1)
-        # frame.columnconfigure(1, weight=5)
+        # Configure the column width
         frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
         frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
 
