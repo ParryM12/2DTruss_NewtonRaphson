@@ -66,6 +66,10 @@ class TrussAnalysisApp(tk.Tk):
         self.ele_number = 0
         self.force_number = 0
         self.support_number = 0
+        self.add_element_initialise = 0
+        self.add_support_initialise = 0
+        self.add_load_initialise = 0
+        self.add_calc_initialise = 0
         self.input_elements = copy.deepcopy(self.input_elements_init)
         self.input_supports = copy.deepcopy(self.input_supports_init)
         self.input_forces = copy.deepcopy(self.input_forces_init)
@@ -111,56 +115,79 @@ class TrussAnalysisApp(tk.Tk):
         # icon_image = ImageTk.PhotoImage(data=GUI_Settings.return_icon_bytestring())
         # root.tk.call('wm', 'iconphoto', root._w, icon_image)
 
-        # Current system information in bottom (dynamic)
+        # Frame for system information and scrollbar
+        sys_info_frame = tk.Frame(self)
+        sys_info_frame.place(relx=0.01, rely=0.72, relwidth=0.4, relheight=0.17)  # Adjust dimensions as needed
+
+        # Text widget for system information
         current_system_information_label = tk.Label(self, text="System Information:",
                                                     font=GUI_Settings.FRAME_HEADER_FONT)
         current_system_information_label.place(relx=0.01, rely=0.7)
         initial_system_information = f"Information about the system parameters will be displayed here."
-        self.current_system_information = tk.Text(self, width=round(GUI_Settings.screensize[0] * 0.07),
-                                                  height=round(GUI_Settings.screensize[1] * 0.013), wrap=tk.WORD,
+        self.current_system_information = tk.Text(sys_info_frame, wrap=tk.WORD,
                                                   font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
-        self.current_system_information.place(relx=0.01, rely=0.72)
+        self.current_system_information.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.current_system_information.insert(tk.END, initial_system_information)
         self.current_system_information.config(state='disabled')
 
-        # Calculation information in bottom (dynamic)
+        # Scrollbar for the Text widget
+        scrollbar_systeminfo = tk.Scrollbar(sys_info_frame, orient='vertical',
+                                            command=self.current_system_information.yview)
+        scrollbar_systeminfo.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Attach the scrollbar to the Text widget
+        self.current_system_information.config(yscrollcommand=scrollbar_systeminfo.set)
+
+        # Frame for calculation information and scrollbar
+        calc_info_frame = tk.Frame(self)
+        calc_info_frame.place(relx=0.47, rely=0.72, relwidth=0.4, relheight=0.17)  # Adjust dimensions as needed
+
+        # Text widget for calculation information
         calculation_information_label = tk.Label(self, text="Calculation Information:",
                                                  font=GUI_Settings.FRAME_HEADER_FONT)
-        calculation_information_label.place(relx=0.5, rely=0.7)
+        calculation_information_label.place(relx=0.47, rely=0.7)
         initial_calculation_information = f"Information about the calculation will be displayed here."
-        current_calculation_information = tk.Text(self, width=round(GUI_Settings.screensize[0] * 0.07),
-                                                  height=round(GUI_Settings.screensize[1] * 0.013), wrap=tk.WORD,
-                                                  font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
-        current_calculation_information.place(relx=0.5, rely=0.72)
-        current_calculation_information.insert(tk.END, initial_calculation_information)
-        current_calculation_information.config(state='disabled')
+        self.current_calculation_information = tk.Text(calc_info_frame, wrap=tk.WORD,
+                                                       font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
+        self.current_calculation_information.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.current_calculation_information.insert(tk.END, initial_calculation_information)
+        self.current_calculation_information.config(state='disabled')
+
+        # Scrollbar for the Text widget
+        scrollbar_calcinfo = tk.Scrollbar(calc_info_frame, orient='vertical',
+                                          command=self.current_calculation_information.yview)
+        scrollbar_calcinfo.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Attach the scrollbar to the Text widget
+        self.current_calculation_information.config(yscrollcommand=scrollbar_calcinfo.set)
 
     def update_system_information(self):
         info_text = "Current System Information:\n"
 
         # Adding information about elements
-        if self.input_elements:
+        if self.input_elements and self.add_element_initialise == 1:
             info_text += "\nElements:\n"
             for ele in self.input_elements.values():
-                info_text += (f"Element {ele['ele_number']}: Node i = {ele['ele_node_i']}, Node j = {ele['ele_node_j']},"
-                              f" A = {ele['ele_A']} cm², E = {ele['ele_E']} MPa, α = {ele['ele_lin_coeff']} [-],"
-                              f" β = {ele['ele_quad_coeff']} [-], ε = {ele['ele_eps_f']} [-].\n")
+                info_text += (
+                    f"Element {ele['ele_number']}: Node i = {ele['ele_node_i']}, Node j = {ele['ele_node_j']},"
+                    f" A = {ele['ele_A']} cm², E = {ele['ele_E']} MPa, α = {ele['ele_lin_coeff']} [-],"
+                    f" β = {ele['ele_quad_coeff']} [-], ε = {ele['ele_eps_f']} [-].\n")
 
         # Adding information about supports
-        if self.input_supports:
+        if self.input_supports and self.add_support_initialise == 1:
             info_text += "\nSupports:\n"
             for sup in self.input_supports.values():
                 info_text += (f"Support {sup['sup_number']}: Node = {sup['sup_node']}, c_x = {sup['c_x']} kN/m, "
                               f"c_y = {sup['c_y']} kN/m.\n")
 
         # Adding information about loads
-        if self.input_forces:
+        if self.input_forces and self.add_load_initialise == 1:
             info_text += "\nLoads:\n"
             for load in self.input_forces.values():
                 info_text += (f"Load {load['force_number']}: Node = {load['force_node']}, F_x = {load['f_x']} kN, "
                               f"F_y = {load['f_y']} kN.\n")
         # Adding information about calculation parameters
-        if self.input_calc_param:
+        if self.input_calc_param and self.add_calc_initialise == 1:
             info_text += "\nCalculation Parameters:\n"
             info_text += f"Method: {self.method_reverse_dict[self.input_calc_param['calc_method']]}, "
             info_text += f"Iterations: {self.input_calc_param['number_of_iterations']}, "
@@ -319,11 +346,12 @@ class TrussAnalysisApp(tk.Tk):
             strain_entry = float(self.strain_entry.get())
 
             # Check for duplicate element
-            for key, element in self.input_elements.items():
-                if element['ele_node_i'] == node_i and element['ele_node_j'] == node_j:
-                    messagebox.showerror("Duplicate Element", "An element with these nodes already exists!"
-                                                              f"Consider editing element {key} instead!")
-                    return
+            if self.add_element_initialise == 1:
+                for key, element in self.input_elements.items():
+                    if element['ele_node_i'] == node_i and element['ele_node_j'] == node_j:
+                        messagebox.showerror("Duplicate Element", "An element with these nodes already exists!"
+                                                                  f"Consider editing element {key} instead!")
+                        return
 
             # Add the new element to the input_elements dictionary
             self.input_elements[str(self.ele_number)] = {'ele_number': self.ele_number,
@@ -345,6 +373,8 @@ class TrussAnalysisApp(tk.Tk):
             self.lin_coeff_entry.delete(0, tk.END)
             self.quad_coeff_entry.delete(0, tk.END)
             self.strain_entry.delete(0, tk.END)
+            # Set element initializer to 1, required to overwrite initial elements properly
+            self.add_element_initialise = 1
             # Update information window
             self.update_system_information()
         except Exception as e:
@@ -505,11 +535,12 @@ class TrussAnalysisApp(tk.Tk):
             force_x = float(self.force_x_entry.get())
             force_y = float(self.force_y_entry.get())
             # Check for duplicate load
-            for key, force in self.input_forces.items():
-                if force['force_node'] == force_node:
-                    messagebox.showerror("Duplicate load", "A load at this node already exists!"
-                                                           f"Consider editing load {key} instead.")
-                    return
+            if self.add_load_initialise == 1:
+                for key, force in self.input_forces.items():
+                    if force['force_node'] == force_node:
+                        messagebox.showerror("Duplicate load", "A load at this node already exists!"
+                                                               f"Consider editing load {key} instead.")
+                        return
             # Add the new load to the input_forces dictionary
             self.input_forces[str(self.force_number)] = {'force_number': self.force_number,
                                                          'force_node': force_node,
@@ -522,6 +553,8 @@ class TrussAnalysisApp(tk.Tk):
             self.force_node_entry.delete(0, tk.END)
             self.force_x_entry.delete(0, tk.END)
             self.force_y_entry.delete(0, tk.END)
+            # Set load initializer to 1, required to overwrite initial loads properly
+            self.add_load_initialise = 1
             # Update information window
             self.update_system_information()
         except Exception as e:
@@ -643,12 +676,13 @@ class TrussAnalysisApp(tk.Tk):
             c_x = float(self.stiffness_cx_entry.get())
             c_y = float(self.stiffness_cy_entry.get())
 
-            # Check for duplicate element
-            for key, support in self.input_supports.items():
-                if support['sup_node'] == support_node:
-                    messagebox.showerror("Duplicate Support", "A support with this node already exists!"
-                                                              f"Consider editing support {key} instead!")
-                    return
+            # Check for duplicate support
+            if self.add_load_initialise == 1:
+                for key, support in self.input_supports.items():
+                    if support['sup_node'] == support_node:
+                        messagebox.showerror("Duplicate Support", "A support with this node already exists!"
+                                                                  f"Consider editing support {key} instead!")
+                        return
 
             # Add the new support to the input_supports dictionary
             self.input_supports[str(self.support_number)] = {'sup_number': self.support_number,
@@ -662,6 +696,8 @@ class TrussAnalysisApp(tk.Tk):
             self.support_node_entry.delete(0, tk.END)
             self.stiffness_cx_entry.delete(0, tk.END)
             self.stiffness_cy_entry.delete(0, tk.END)
+            # Set support initializer to 1, required to overwrite initial supports properly
+            self.add_support_initialise = 1
             # Update information window
             self.update_system_information()
 
@@ -786,6 +822,8 @@ class TrussAnalysisApp(tk.Tk):
         self.input_calc_param = {'calc_method': method,
                                  'number_of_iterations': number_of_iterations,
                                  'delta_f_max': delta_f}
+        # Set calculation parameter initializer to 1, required to overwrite initial parameters properly
+        self.add_calc_initialise = 1
         # Update information window
         self.update_system_information()
 
