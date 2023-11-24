@@ -54,9 +54,15 @@ class TrussAnalysisApp(tk.Tk):
         self.input_calc_param_init = {'calc_method': 'linear',
                                       'number_of_iterations': 0,
                                       'delta_f_max': 0.}
+
         self.method_dict = {'Linear': 'linear',
                             'Newton-Raphson': 'NR',
                             'Mod. Newton-Raphson': 'modNR'}
+
+        self.method_reverse_dict = {'linear': 'Linear',
+                                    'NR': 'Newton-Raphson',
+                                    'modNR': 'Mod. Newton-Raphson'}
+
         self.ele_number = 0
         self.force_number = 0
         self.support_number = 0
@@ -110,24 +116,61 @@ class TrussAnalysisApp(tk.Tk):
                                                     font=GUI_Settings.FRAME_HEADER_FONT)
         current_system_information_label.place(relx=0.01, rely=0.7)
         initial_system_information = f"Information about the system parameters will be displayed here."
-        current_system_information = tk.Text(self, width=round(GUI_Settings.screensize[0] * 0.07),
-                                             height=round(GUI_Settings.screensize[1] * 0.013), wrap=tk.WORD,
-                                             font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
-        current_system_information.place(relx=0.01, rely=0.72)
-        current_system_information.insert(tk.END, initial_system_information)
-        current_system_information.config(state='disabled')
+        self.current_system_information = tk.Text(self, width=round(GUI_Settings.screensize[0] * 0.07),
+                                                  height=round(GUI_Settings.screensize[1] * 0.013), wrap=tk.WORD,
+                                                  font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
+        self.current_system_information.place(relx=0.01, rely=0.72)
+        self.current_system_information.insert(tk.END, initial_system_information)
+        self.current_system_information.config(state='disabled')
 
         # Calculation information in bottom (dynamic)
         calculation_information_label = tk.Label(self, text="Calculation Information:",
                                                  font=GUI_Settings.FRAME_HEADER_FONT)
-        calculation_information_label.place(relx=0.4, rely=0.7)
+        calculation_information_label.place(relx=0.5, rely=0.7)
         initial_calculation_information = f"Information about the calculation will be displayed here."
         current_calculation_information = tk.Text(self, width=round(GUI_Settings.screensize[0] * 0.07),
                                                   height=round(GUI_Settings.screensize[1] * 0.013), wrap=tk.WORD,
                                                   font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
-        current_calculation_information.place(relx=0.4, rely=0.72)
+        current_calculation_information.place(relx=0.5, rely=0.72)
         current_calculation_information.insert(tk.END, initial_calculation_information)
         current_calculation_information.config(state='disabled')
+
+    def update_system_information(self):
+        info_text = "Current System Information:\n"
+
+        # Adding information about elements
+        if self.input_elements:
+            info_text += "\nElements:\n"
+            for ele in self.input_elements.values():
+                info_text += (f"Element {ele['ele_number']}: Node i = {ele['ele_node_i']}, Node j = {ele['ele_node_j']},"
+                              f" A = {ele['ele_A']} cm², E = {ele['ele_E']} MPa, α = {ele['ele_lin_coeff']} [-],"
+                              f" β = {ele['ele_quad_coeff']} [-], ε = {ele['ele_eps_f']} [-].\n")
+
+        # Adding information about supports
+        if self.input_supports:
+            info_text += "\nSupports:\n"
+            for sup in self.input_supports.values():
+                info_text += (f"Support {sup['sup_number']}: Node = {sup['sup_node']}, c_x = {sup['c_x']} kN/m, "
+                              f"c_y = {sup['c_y']} kN/m.\n")
+
+        # Adding information about loads
+        if self.input_forces:
+            info_text += "\nLoads:\n"
+            for load in self.input_forces.values():
+                info_text += (f"Load {load['force_number']}: Node = {load['force_node']}, F_x = {load['f_x']} kN, "
+                              f"F_y = {load['f_y']} kN.\n")
+        # Adding information about calculation parameters
+        if self.input_calc_param:
+            info_text += "\nCalculation Parameters:\n"
+            info_text += f"Method: {self.method_reverse_dict[self.input_calc_param['calc_method']]}, "
+            info_text += f"Iterations: {self.input_calc_param['number_of_iterations']}, "
+            info_text += f"Max node imbalance ΔF = {self.input_calc_param['delta_f_max']} kN.\n"
+
+        # Updating the text widget
+        self.current_system_information.config(state='normal')
+        self.current_system_information.delete(1.0, tk.END)
+        self.current_system_information.insert(tk.END, info_text)
+        self.current_system_information.config(state='disabled')
 
     def add_elements_form(self, parent_frame):
         # Create Frame
@@ -302,12 +345,13 @@ class TrussAnalysisApp(tk.Tk):
             self.lin_coeff_entry.delete(0, tk.END)
             self.quad_coeff_entry.delete(0, tk.END)
             self.strain_entry.delete(0, tk.END)
+            # Update information window
+            self.update_system_information()
         except Exception as e:
             # Show a warning message box
             messagebox.showerror("Error", f"An error occurred while adding the element: {e}")
             print(f"An error occurred while adding the element: {e}")
             return
-
 
     def edit_element(self):
         self.edit_window = tk.Toplevel(self)
@@ -414,7 +458,9 @@ class TrussAnalysisApp(tk.Tk):
             'ele_lin_coeff': lin_coeff,
             'ele_quad_coeff': quad_coeff,
             'ele_eps_f': strain_entry}
-
+        # Update information window
+        self.update_system_information()
+        # Close window
         self.edit_window.destroy()
 
     def update_element_dropdown(self):
@@ -442,7 +488,8 @@ class TrussAnalysisApp(tk.Tk):
             new_input_elements[str(i)] = self.input_elements[key]
 
         self.input_elements = new_input_elements
-
+        # Update information window
+        self.update_system_information()
         # Update the combobox options and entry fields
         self.update_element_dropdown()
 
@@ -475,6 +522,8 @@ class TrussAnalysisApp(tk.Tk):
             self.force_node_entry.delete(0, tk.END)
             self.force_x_entry.delete(0, tk.END)
             self.force_y_entry.delete(0, tk.END)
+            # Update information window
+            self.update_system_information()
         except Exception as e:
             print(f"An error occurred while adding the load: {e}")
 
@@ -547,7 +596,9 @@ class TrussAnalysisApp(tk.Tk):
             'force_node': force_node,
             'f_x': f_x,
             'f_y': f_y}
-
+        # Update information window
+        self.update_system_information()
+        # Close window
         self.edit_window_load.destroy()
 
     def update_load_dropdown(self):
@@ -575,7 +626,8 @@ class TrussAnalysisApp(tk.Tk):
             new_input_loads[str(i)] = self.input_forces[key]
 
         self.input_forces = new_input_loads
-
+        # Update information window
+        self.update_system_information()
         # Update the combobox options and entry fields
         self.update_load_dropdown()
 
@@ -610,6 +662,8 @@ class TrussAnalysisApp(tk.Tk):
             self.support_node_entry.delete(0, tk.END)
             self.stiffness_cx_entry.delete(0, tk.END)
             self.stiffness_cy_entry.delete(0, tk.END)
+            # Update information window
+            self.update_system_information()
 
         except Exception as e:
             print(f"An error occurred while adding the support: {e}")
@@ -683,7 +737,9 @@ class TrussAnalysisApp(tk.Tk):
             'sup_node': support_node,
             'c_x': c_x,
             'c_y': c_y}
-
+        # Update information window
+        self.update_system_information()
+        # Close window
         self.edit_window_support.destroy()
 
     def update_support_dropdown(self):
@@ -711,7 +767,8 @@ class TrussAnalysisApp(tk.Tk):
             new_input_supports[str(i)] = self.input_supports[key]
 
         self.input_supports = new_input_supports
-
+        # Update information window
+        self.update_system_information()
         # Update the combobox options and entry fields
         self.update_support_dropdown()
 
@@ -729,6 +786,8 @@ class TrussAnalysisApp(tk.Tk):
         self.input_calc_param = {'calc_method': method,
                                  'number_of_iterations': number_of_iterations,
                                  'delta_f_max': delta_f}
+        # Update information window
+        self.update_system_information()
 
     def parse_coordinates(self, coord_str: str) -> tuple[float, float]:
         # Removing common bracket types and spaces

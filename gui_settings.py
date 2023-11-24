@@ -22,7 +22,7 @@ class GUI_Settings:
     # Fonts/Styles
     FRAME_HEADER_FONT = ('Arial', 12, 'bold')
     STANDARD_FONT_1 = ('Arial', 12)
-    STANDARD_FONT_2 = ('Arial', 7)
+    STANDARD_FONT_2 = ('Arial', 8)
     STANDARD_FONT_BUTTON = ('Arial', 10)
 
     # Width of columns in frames
