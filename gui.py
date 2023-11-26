@@ -152,6 +152,9 @@ class TrussAnalysisApp(tk.Tk):
         self.current_calculation_information.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.current_calculation_information.insert(tk.END, initial_calculation_information)
         self.current_calculation_information.config(state='disabled')
+        # Defining tags for different text colors in current_calculation_information Text widget
+        self.current_calculation_information.tag_config("green_text", foreground="green")
+        self.current_calculation_information.tag_config("red_text", foreground="red")
 
         # Scrollbar for the Text widget
         scrollbar_calcinfo = tk.Scrollbar(calc_info_frame, orient='vertical',
@@ -198,6 +201,69 @@ class TrussAnalysisApp(tk.Tk):
         self.current_system_information.delete(1.0, tk.END)
         self.current_system_information.insert(tk.END, info_text)
         self.current_system_information.config(state='disabled')
+
+    def update_calculation_information(self):
+        info_text = "Calculation Results:\n"
+        imbalance_info = ""
+        imbalance_tag = None
+
+        if self.solution is not None:
+            # Case: Nonlinear calculation
+            if self.solution['node_displacements_nonlinear'] is not None:
+                # Node Displacements
+                info_text += "\nNode Displacements (Nonlinear Calculation):\n"
+                for node, displacement in enumerate(self.solution['node_displacements_nonlinear']):
+                    info_text += (f"Node {node}: u = {round(displacement[0]*1000, 3)} mm, w = "
+                                  f"{round(displacement[1]*1000, 2)} mm.\n")
+
+                # Axial Forces - Linear Calculation
+                info_text += "\nAxial Forces (Linear Calculation):\n"
+                for element, force in enumerate(self.solution['axial_forces_linear']):
+                    info_text += f"Element {element}: N = {force} kN.\n"
+
+                # Axial Forces - Nonlinear Calculation
+                info_text += "\nAxial Forces (Nonlinear Calculation):\n"
+                for element, force in enumerate(self.solution['axial_forces_nonlinear']):
+                    info_text += f"Element {element}: N = {force} kN.\n"
+
+                # Additional Information (iterations, force imbalance)
+                max_nodal_force_imbalance = max(abs(self.solution['node_forces_mismatch']))
+                delta_f_max = self.input_calc_param['delta_f_max']
+                info_text += "\nConvergence of the solution:\n"
+                # Check nodal force imbalance and apply tag
+                if max_nodal_force_imbalance < delta_f_max:
+                    imbalance_info = (f"SUCCESS: Termination criterion ΔF = {max_nodal_force_imbalance[0]} kN < "
+                                      f"ΔF_max = {delta_f_max} kN "
+                                      f"met at iteration step {self.solution['iteration_break_number']}.")
+                    imbalance_tag = "green_text"
+                else:
+                    imbalance_info = (f"WARNING: Termination criterion ΔF = {max_nodal_force_imbalance[0]} kN < "
+                                      f"ΔF_max = {delta_f_max}  kN is not met! The iteration stopped after maximal "
+                                      f"amount of {self.solution['iteration_break_number']} iterations.")
+                    imbalance_tag = "red_text"
+            else:
+                # Node Displacements
+                info_text += "\nNode Displacements (Linear Calculation):\n"
+                for node, displacement in enumerate(self.solution['node_displacements_linear']):
+                    info_text += (f"Node {node}: u = {round(displacement[0] * 1000, 3)} mm, w = "
+                                  f"{round(displacement[1] * 1000, 2)} mm.\n")
+
+                # Axial Forces - Linear Calculation
+                info_text += "\nAxial Forces (Linear Calculation):\n"
+                for element, force in enumerate(self.solution['axial_forces_linear']):
+                    info_text += f"Element {element}: N = {force} kN.\n"
+
+        else:
+            info_text += "\nNo calculation results available."
+
+        # Updating the text widget
+        self.current_calculation_information.config(state='normal')
+        self.current_calculation_information.delete(1.0, tk.END)
+        self.current_calculation_information.insert(tk.END, info_text)
+        if imbalance_tag:
+            self.current_calculation_information.insert(tk.END, imbalance_info, imbalance_tag)
+
+        self.current_calculation_information.config(state='disabled')
 
     def add_elements_form(self, parent_frame):
         # Create Frame
@@ -848,6 +914,7 @@ class TrussAnalysisApp(tk.Tk):
         # calculation = Calculation(*input_parameters_calculation)
         calculation = Calculation(self.input_elements, self.input_supports, self.input_forces, self.input_calc_param)
         self.solution = calculation.return_solution()
+        self.update_calculation_information()
         print('The axial forces of the linear elastic calculation are:')
         print(self.solution['axial_forces_linear'])
         print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')

@@ -72,8 +72,9 @@ class Calculation:
         self.axial_forces = np.arange(0)
         self.num_elem = []
         self.displacements_local = []
-        self.displacements_cor_total = []
-        self.axial_forces_cor = []
+        self.displacements_cor_total = None
+        self.axial_forces_cor = None
+        self.iter_break_number = 0
 
     def return_solution(self):
         """
@@ -229,7 +230,7 @@ class Calculation:
                                              np.array([-axial_forces_cor[i][0], 0, axial_forces_cor[i][0], 0]).reshape(
                                                  4, 1))
                     f_vec_cor[self.element_matrices[i]['DOFs']] += axial_forces_cor_glob
-                f_vec_mismatch = self.f_vec - f_vec_cor
+                self.f_vec_mismatch = self.f_vec - f_vec_cor
                 # Calculate additional displacements
                 if self.calc_param['calc_method'] in 'NR':
                     for i in range(len(self.element_matrices)):
@@ -243,14 +244,15 @@ class Calculation:
 
                 # Reduce load vector and check stop criterion
                 rows_to_zero = np.diag(self.k_sys) == 1
-                f_vec_mismatch[rows_to_zero] = 0
+                self.f_vec_mismatch[rows_to_zero] = 0
                 stop_criterion = self.calc_param['delta_f_max']
-                if max(abs(f_vec_mismatch)) <= stop_criterion:
+                if max(abs(self.f_vec_mismatch)) <= stop_criterion:
                     print(f'Stop criterion of Δf ≤ {stop_criterion} kN reached at iteration step {iter_number}!')
+                    self.iter_break_number = iter_number
                     break
 
                 # Calculate total displacement
-                displacements_cor = displacements_cor + np.linalg.solve(self.k_sys, f_vec_mismatch)
+                displacements_cor = displacements_cor + np.linalg.solve(self.k_sys, self.f_vec_mismatch)
                 self.displacements_cor_total = self.displacements + displacements_cor
 
                 # Update strain and axial forces
@@ -259,11 +261,15 @@ class Calculation:
                                                    @ self.displacements_cor_total[self.element_matrices[i]['DOFs']])
                     strain[i] = ((self.displacements_local[i][2] - self.displacements_local[i][0])
                                  / self.element_matrices[i]['length'])
-                    self.axial_forces_cor = sigma(strain, ele_lin_coeff, ele_quad_coeff, ele_e, ele_eps_f) * ele_area
-
+                self.axial_forces_cor = np.array(sigma(strain, ele_lin_coeff, ele_quad_coeff, ele_e, ele_eps_f)
+                                                 * ele_area)
+                # Flatten the list of lists into a single list
+                self.axial_forces_cor = [force[0] for force in self.axial_forces_cor if force]
+                # self.f_vec_mismatch = [force[0] for force in self.f_vec_mismatch if force]
                 if iter_number == self.calc_param['number_of_iterations']:
                     print(f'Maximum number of {iter_number} iterations reached without meeting the stop criterion'
                           f' Δf ≤ {stop_criterion} kN!')
+                    self.iter_break_number = self.calc_param['number_of_iterations']
         elif self.calc_param['calc_method'] in 'NR' or 'modNR' and sum(ele_quad_coeff) == 0:
             self.axial_forces_cor = self.axial_forces
             print(f'Attention: You selected a nonlinear Newton-Raphson calculation, '
@@ -273,10 +279,12 @@ class Calculation:
                   f'but you set the nonlinear parameter β of at least one element not to 0! Calculating linear...')
 
         # Return solution
-        self.solution = {'nodes': self.nodes, 'node_displacements_linear': self.displacements,
-                         'node_displacements_nonlinear': self.displacements_cor_total,
+        self.solution = {'nodes': self.nodes, 'node_displacements_linear': self.displacements.reshape(-1, 2),
+                         'node_displacements_nonlinear': self.displacements_cor_total.reshape(-1, 2),
                          'axial_forces_linear': np.round(self.axial_forces, 2),
-                         'axial_forces_nonlinear': np.round(self.axial_forces_cor, 2)}
+                         'axial_forces_nonlinear': np.round(self.axial_forces_cor, 2),
+                         'node_forces_mismatch': np.round(self.f_vec_mismatch),
+                         'iteration_break_number': self.iter_break_number}
 
 
 # Example for testing and debugging
