@@ -70,6 +70,7 @@ class TrussAnalysisApp(tk.Tk):
         self.add_support_initialise = 0
         self.add_load_initialise = 0
         self.add_calc_initialise = 0
+        self.max_force = 1
         self.input_elements = copy.deepcopy(self.input_elements_init)
         self.input_supports = copy.deepcopy(self.input_supports_init)
         self.input_forces = copy.deepcopy(self.input_forces_init)
@@ -103,7 +104,19 @@ class TrussAnalysisApp(tk.Tk):
                                 height=GUI_Settings.screensize[1] * 0.6,
                                 bg=GUI_Settings.CANVAS_BG, highlightbackground="black", highlightthickness=1)
         self.canvas.place(relx=0.02, rely=0.04)
-        # self.canvas.pack(side="right", fill="both", expand=True, padx=50, pady=50)
+        # Add coordinate system to canvas
+        # Define starting point (top-left corner with some padding)
+        start_x, start_y = 20, 20
+        # Length of the arrows
+        arrow_length = 40
+        # Draw x-axis arrow
+        self.canvas.create_line(start_x, start_y, start_x + arrow_length, start_y, arrow=tk.LAST)
+        self.canvas.create_text(start_x + arrow_length + 10, start_y, text="x", anchor="center", width=1.5,
+                                font=GUI_Settings.ITALIC_FONT_1)
+        # Draw y-axis arrow
+        self.canvas.create_line(start_x, start_y, start_x, start_y + arrow_length, arrow=tk.LAST)
+        self.canvas.create_text(start_x, start_y + arrow_length + 10, text="y", anchor="center", width=1.5,
+                                font=GUI_Settings.ITALIC_FONT_1)
 
         # Calculation button
         ttk.Button(main_frame, text="Run Calculation", command=self.run_calculation).pack(pady=10)
@@ -265,6 +278,140 @@ class TrussAnalysisApp(tk.Tk):
 
         self.current_calculation_information.config(state='disabled')
 
+    def draw_coordinate_system(self):
+        # Define starting point (top-left corner with some padding)
+        start_x, start_y = 20, 20
+
+        # Length of the arrows
+        arrow_length = 40
+
+        # Draw x-axis arrow
+        self.canvas.create_line(start_x, start_y, start_x + arrow_length, start_y, arrow=tk.LAST)
+        self.canvas.create_text(start_x + arrow_length + 10, start_y, text="x", anchor="center", width=1.5,
+                                font=GUI_Settings.ITALIC_FONT_1)
+
+        # Draw y-axis arrow
+        self.canvas.create_line(start_x, start_y, start_x, start_y + arrow_length, arrow=tk.LAST)
+        self.canvas.create_text(start_x, start_y + arrow_length + 10, text="y", anchor="center", width=1.5,
+                                font=GUI_Settings.ITALIC_FONT_1)
+
+    def calculate_bounds_and_scale(self):
+        min_x = min([node[0] for element in self.input_elements.values() for node in
+                     [element['ele_node_i'], element['ele_node_j']]], default=0)
+        max_x = max([node[0] for element in self.input_elements.values() for node in
+                     [element['ele_node_i'], element['ele_node_j']]], default=0)
+        min_y = min([node[1] for element in self.input_elements.values() for node in
+                     [element['ele_node_i'], element['ele_node_j']]], default=0)
+        max_y = max([node[1] for element in self.input_elements.values() for node in
+                     [element['ele_node_i'], element['ele_node_j']]], default=0)
+
+        truss_width = max_x - min_x
+        truss_height = max_y - min_y
+
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+
+        scale_x = canvas_width / truss_width if truss_width != 0 else 1
+        scale_y = canvas_height / truss_height if truss_height != 0 else 1
+
+        scale = min(scale_x, scale_y) * 0.65  # 0.8 for padding
+
+        translate_x = (canvas_width - scale * truss_width) / 2 - min_x * scale
+        translate_y = (canvas_height - scale * truss_height) / 2 - min_y * scale
+
+        return scale, translate_x, translate_y
+
+    def scale_and_translate(self, x, y):
+        scale, translate_x, translate_y = self.calculate_bounds_and_scale()
+        return x * scale + translate_x, y * scale + translate_y
+
+    def draw_element(self):
+        # Draw Elements (Truss Members)
+        for element in self.input_elements.values():
+            scale, translate_x, translate_y = self.calculate_bounds_and_scale()
+            hinge_radius = 0.05 * scale
+            node_i = self.scale_and_translate(*element['ele_node_i'])
+            node_j = self.scale_and_translate(*element['ele_node_j'])
+            # Draw the line representing the truss element
+            self.canvas.create_line(node_i[0], node_i[1], node_j[0], node_j[1], fill="black", width=2.5)
+            # Draw hinge at node_i
+            self.canvas.create_oval(node_i[0] - hinge_radius, node_i[1] - hinge_radius,
+                                    node_i[0] + hinge_radius, node_i[1] + hinge_radius, outline="black", fill="white",
+                                    width=2.5)
+
+            # Draw hinge at node_j
+            self.canvas.create_oval(node_j[0] - hinge_radius, node_j[1] - hinge_radius,
+                                    node_j[0] + hinge_radius, node_j[1] + hinge_radius, outline="black", fill="white",
+                                    width=2.5)
+
+    def draw_support(self):
+        # Draw Supports
+        for support in self.input_supports.values():
+            node = self.scale_and_translate(*support['sup_node'])
+            scale, translate_x, translate_y = self.calculate_bounds_and_scale()
+            hinge_radius = 0.05 * scale
+            x, y = node
+            dxy = 0.2 * scale  # Defines the size of the plotted support
+            dxy_hline = 0.25 * scale  # Defines the size of the horizontal line of
+            # Support fixed in x- and y- direction:
+            if support['c_x'] == 1 and support['c_y'] == 1:
+                points = [(x, y), (x - dxy, y + dxy), (x + dxy, y + dxy), (x, y)]
+                for i in range(len(points) - 1):
+                    start = points[i]
+                    end = points[i + 1]
+                    self.canvas.create_line(start[0], start[1], end[0], end[1], fill="black", width=2.5)
+            # Support fixed only in x-direction:
+            if support['c_x'] == 1 and support['c_y'] == 0:
+                points = [(x, y), (x + dxy, y - dxy), (x + dxy, y + dxy), (x, y)]
+                points_hline = [(x + dxy_hline, y - dxy_hline), (x + dxy_hline, y + dxy_hline)]
+                self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
+                                        fill="black", width=2.5)
+                for i in range(len(points) - 1):
+                    start = points[i]
+                    end = points[i + 1]
+                    self.canvas.create_line(start[0], start[1], end[0], end[1], fill="black", width=2.5)
+            # Support fixed only in y-direction:
+            if support['c_x'] == 0 and support['c_y'] == 1:
+                points = [(x, y), (x - dxy, y + dxy), (x + dxy, y + dxy), (x, y)]
+                points_hline = [(x - dxy_hline, y + dxy_hline), (x + dxy_hline, y + dxy_hline)]
+                self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
+                                        fill="black", width=2.5)
+                for i in range(len(points) - 1):
+                    start = points[i]
+                    end = points[i + 1]
+                    self.canvas.create_line(start[0], start[1], end[0], end[1], fill="black", width=2.5)
+            # Draw hinge at node
+            self.canvas.create_oval(node[0] - hinge_radius, node[1] - hinge_radius,
+                                    node[0] + hinge_radius, node[1] + hinge_radius, outline="black", fill="white",
+                                    width=2.5)
+
+    def draw_load(self):
+        scale, translate_x, translate_y = self.calculate_bounds_and_scale()
+        # Draw Loads
+        dxy = 0.07 * scale  # Defines the distance of the force vector to the corresponding node
+        for load in self.input_forces.values():
+            node = self.scale_and_translate(*load['force_node'])
+            f_x, f_y = load['f_x'], load['f_y']
+            self.max_force = max(self.max_force, abs(f_x), abs(f_y))
+            scale_fx = f_x / self.max_force * scale
+            scale_fy = f_y / self.max_force * scale
+            if f_x != 0:
+                self.canvas.create_line(node[0] + dxy, node[1], node[0] + 0.7 * scale_fx, node[1], arrow=tk.LAST,
+                                        width=2.5, fill="blue")
+                f_x_label = f"F = {f_x} kN"
+                label_offset_x = 0.05 * scale
+                label_offset_y = -0.07 * scale
+                self.canvas.create_text(node[0] + 0.7 * scale_fx + label_offset_x, node[1] + label_offset_y,
+                                        text=f_x_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
+            if f_y != 0:
+                self.canvas.create_line(node[0], node[1] - 0.7 * scale_fy, node[0], node[1] - dxy, arrow=tk.LAST,
+                                        width=2.5, fill="blue")
+                f_y_label = f"F = {f_y} kN"
+                label_offset_x = 0.05 * scale
+                label_offset_y = -0.07 * scale
+                self.canvas.create_text(node[0] + label_offset_x, node[1] - 0.7 * scale_fy + label_offset_y,
+                                        text=f_y_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
+
     def add_elements_form(self, parent_frame):
         # Create Frame
         frame = ttk.LabelFrame(parent_frame, text="Define elements")
@@ -388,7 +535,7 @@ class TrussAnalysisApp(tk.Tk):
         self.num_iterations_entry = ttk.Entry(frame)
         self.num_iterations_entry.grid(row=1, column=1, sticky='ew', padx=5)
 
-        ttk.Label(frame, text="Max. deviation F [kN]:").grid(row=2, column=0, sticky='w')
+        ttk.Label(frame, text="Max. deviation ΔF_max [kN]:").grid(row=2, column=0, sticky='w')
         self.delta_f_entry = ttk.Entry(frame)
         self.delta_f_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
@@ -443,6 +590,12 @@ class TrussAnalysisApp(tk.Tk):
             self.add_element_initialise = 1
             # Update information window
             self.update_system_information()
+            # Draw element on canvas
+            self.canvas.delete("all")  # Clear the canvas
+            self.draw_coordinate_system()
+            self.draw_element()
+            self.draw_support()
+            self.draw_load()
         except Exception as e:
             # Show a warning message box
             messagebox.showerror("Error", f"An error occurred while adding the element: {e}")
@@ -556,6 +709,12 @@ class TrussAnalysisApp(tk.Tk):
             'ele_eps_f': strain_entry}
         # Update information window
         self.update_system_information()
+        # Draw elements, supports and loads on canvas
+        self.canvas.delete("all")  # Clear the canvas
+        self.draw_coordinate_system()
+        self.draw_element()
+        self.draw_support()
+        self.draw_load()
         # Close window
         self.edit_window.destroy()
 
@@ -586,6 +745,12 @@ class TrussAnalysisApp(tk.Tk):
         self.input_elements = new_input_elements
         # Update information window
         self.update_system_information()
+        # Draw elements, supports and loads on canvas
+        self.canvas.delete("all")  # Clear the canvas
+        self.draw_coordinate_system()
+        self.draw_element()
+        self.draw_support()
+        self.draw_load()
         # Update the combobox options and entry fields
         self.update_element_dropdown()
 
@@ -623,6 +788,12 @@ class TrussAnalysisApp(tk.Tk):
             self.add_load_initialise = 1
             # Update information window
             self.update_system_information()
+            # Draw elements, supports and loads on canvas
+            self.canvas.delete("all")  # Clear the canvas
+            self.draw_coordinate_system()
+            self.draw_element()
+            self.draw_support()
+            self.draw_load()
         except Exception as e:
             print(f"An error occurred while adding the load: {e}")
 
@@ -697,6 +868,12 @@ class TrussAnalysisApp(tk.Tk):
             'f_y': f_y}
         # Update information window
         self.update_system_information()
+        # Draw elements, supports and loads on canvas
+        self.canvas.delete("all")  # Clear the canvas
+        self.draw_coordinate_system()
+        self.draw_element()
+        self.draw_support()
+        self.draw_load()
         # Close window
         self.edit_window_load.destroy()
 
@@ -727,6 +904,12 @@ class TrussAnalysisApp(tk.Tk):
         self.input_forces = new_input_loads
         # Update information window
         self.update_system_information()
+        # Draw elements, supports and loads on canvas
+        self.canvas.delete("all")  # Clear the canvas
+        self.draw_coordinate_system()
+        self.draw_element()
+        self.draw_support()
+        self.draw_load()
         # Update the combobox options and entry fields
         self.update_load_dropdown()
 
@@ -766,6 +949,12 @@ class TrussAnalysisApp(tk.Tk):
             self.add_support_initialise = 1
             # Update information window
             self.update_system_information()
+            # Draw elements, supports and loads on canvas
+            self.canvas.delete("all")  # Clear the canvas
+            self.draw_coordinate_system()
+            self.draw_element()
+            self.draw_support()
+            self.draw_load()
 
         except Exception as e:
             print(f"An error occurred while adding the support: {e}")
@@ -841,6 +1030,12 @@ class TrussAnalysisApp(tk.Tk):
             'c_y': c_y}
         # Update information window
         self.update_system_information()
+        # Draw elements, supports and loads on canvas
+        self.canvas.delete("all")  # Clear the canvas
+        self.draw_coordinate_system()
+        self.draw_element()
+        self.draw_support()
+        self.draw_load()
         # Close window
         self.edit_window_support.destroy()
 
@@ -871,6 +1066,12 @@ class TrussAnalysisApp(tk.Tk):
         self.input_supports = new_input_supports
         # Update information window
         self.update_system_information()
+        # Draw elements, supports and loads on canvas
+        self.canvas.delete("all")  # Clear the canvas
+        self.draw_coordinate_system()
+        self.draw_element()
+        self.draw_support()
+        self.draw_load()
         # Update the combobox options and entry fields
         self.update_support_dropdown()
 
@@ -921,9 +1122,21 @@ class TrussAnalysisApp(tk.Tk):
         print(self.solution['axial_forces_nonlinear'])
 
     def clear_all(self):
-        pass
-        # Clear all
-        # ...
+        self.canvas.delete("all")  # Clear the canvas
+        self.draw_coordinate_system()
+        self.input_elements = copy.deepcopy(self.input_elements_init)
+        self.input_supports = copy.deepcopy(self.input_supports_init)
+        self.input_forces = copy.deepcopy(self.input_forces_init)
+        self.input_calc_param = copy.deepcopy(self.input_calc_param_init)
+        self.add_element_initialise = 0
+        self.add_support_initialise = 0
+        self.add_load_initialise = 0
+        self.add_calc_initialise = 0
+        self.solution = None
+        # Update information window
+        self.update_system_information()
+        # Update information window
+        self.update_calculation_information()
 
 
 # Run the application
