@@ -387,8 +387,9 @@ class TrussAnalysisApp(tk.Tk):
 
     def draw_load(self):
         scale, translate_x, translate_y = self.calculate_bounds_and_scale()
+        arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed.
         # Draw Loads
-        dxy = 0.07 * scale  # Defines the distance of the force vector to the corresponding node
+        dxy = 0.09 * scale  # Defines the distance of the force vector to the corresponding node
         for load in self.input_forces.values():
             node = self.scale_and_translate(*load['force_node'])
             f_x, f_y = load['f_x'], load['f_y']
@@ -397,18 +398,18 @@ class TrussAnalysisApp(tk.Tk):
             scale_fy = f_y / self.max_force * scale
             if f_x != 0:
                 self.canvas.create_line(node[0] + dxy, node[1], node[0] + 0.7 * scale_fx, node[1], arrow=tk.LAST,
-                                        width=2.5, fill="blue")
-                f_x_label = f"F = {f_x} kN"
-                label_offset_x = 0.05 * scale
-                label_offset_y = -0.07 * scale
+                                        width=2.5, fill="blue", arrowshape=arrow_shape)
+                f_x_label = f"H = {f_x} kN"
+                label_offset_x = 0.08 * scale
+                label_offset_y = -0.1 * scale
                 self.canvas.create_text(node[0] + 0.7 * scale_fx + label_offset_x, node[1] + label_offset_y,
                                         text=f_x_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
             if f_y != 0:
                 self.canvas.create_line(node[0], node[1] - 0.7 * scale_fy, node[0], node[1] - dxy, arrow=tk.LAST,
-                                        width=2.5, fill="blue")
+                                        width=2.5, fill="blue", arrowshape=arrow_shape)
                 f_y_label = f"F = {f_y} kN"
                 label_offset_x = 0.05 * scale
-                label_offset_y = -0.07 * scale
+                label_offset_y = -0.09 * scale
                 self.canvas.create_text(node[0] + label_offset_x, node[1] - 0.7 * scale_fy + label_offset_y,
                                         text=f_y_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
 
