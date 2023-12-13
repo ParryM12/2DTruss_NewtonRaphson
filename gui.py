@@ -226,8 +226,8 @@ class TrussAnalysisApp(tk.Tk):
                 # Node Displacements
                 info_text += "\nNode Displacements (Nonlinear Calculation):\n"
                 for node, displacement in enumerate(self.solution['node_displacements_nonlinear']):
-                    info_text += (f"Node {node}: u = {round(displacement[0]*1000, 3)} mm, w = "
-                                  f"{round(displacement[1]*1000, 2)} mm.\n")
+                    info_text += (f"Node {node}: u = {round(displacement[0] * 1000, 3)} mm, w = "
+                                  f"{round(displacement[1] * 1000, 2)} mm.\n")
 
                 # Axial Forces - Linear Calculation
                 info_text += "\nAxial Forces (Linear Calculation):\n"
@@ -394,20 +394,28 @@ class TrussAnalysisApp(tk.Tk):
             node = self.scale_and_translate(*load['force_node'])
             f_x, f_y = load['f_x'], load['f_y']
             self.max_force = max(self.max_force, abs(f_x), abs(f_y))
-            scale_fx = f_x / self.max_force * scale
-            scale_fy = f_y / self.max_force * scale
+            scale_fx = abs(f_x / self.max_force * scale)
+            scale_fy = abs(f_y / self.max_force * scale)
             if f_x != 0:
-                self.canvas.create_line(node[0] + dxy, node[1], node[0] + 0.7 * scale_fx, node[1], arrow=tk.LAST,
-                                        width=2.5, fill="blue", arrowshape=arrow_shape)
-                f_x_label = f"H = {f_x} kN"
+                if f_x > 0:
+                    self.canvas.create_line(node[0] + dxy, node[1], node[0] + 0.7 * scale_fx, node[1], arrow=tk.LAST,
+                                            width=2.5, fill="blue", arrowshape=arrow_shape)
+                else:
+                    self.canvas.create_line(node[0] + 0.7 * scale_fx, node[1], node[0] + dxy, node[1], arrow=tk.LAST,
+                                            width=2.5, fill="blue", arrowshape=arrow_shape)
+                f_x_label = f"H = {abs(f_x)} kN"
                 label_offset_x = 0.08 * scale
                 label_offset_y = -0.1 * scale
                 self.canvas.create_text(node[0] + 0.7 * scale_fx + label_offset_x, node[1] + label_offset_y,
                                         text=f_x_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
             if f_y != 0:
-                self.canvas.create_line(node[0], node[1] - 0.7 * scale_fy, node[0], node[1] - dxy, arrow=tk.LAST,
-                                        width=2.5, fill="blue", arrowshape=arrow_shape)
-                f_y_label = f"F = {f_y} kN"
+                if f_y > 0:
+                    self.canvas.create_line(node[0], node[1] - 0.7 * scale_fy, node[0], node[1] - dxy, arrow=tk.LAST,
+                                            width=2.5, fill="blue", arrowshape=arrow_shape)
+                else:
+                    self.canvas.create_line(node[0], node[1] - dxy, node[0], node[1] - 0.7 * scale_fy, arrow=tk.LAST,
+                                            width=2.5, fill="blue", arrowshape=arrow_shape)
+                f_y_label = f"F = {abs(f_y)} kN"
                 label_offset_x = 0.05 * scale
                 label_offset_y = -0.09 * scale
                 self.canvas.create_text(node[0] + label_offset_x, node[1] - 0.7 * scale_fy + label_offset_y,
@@ -1079,13 +1087,18 @@ class TrussAnalysisApp(tk.Tk):
     def calc_settings(self):
         # Get settings from calc setting form
         method = str(self.method_dict[self.method_combobox.get()])
-        try:
-            number_of_iterations = int(self.num_iterations_entry.get())
-        except ValueError as e:
-            # Show a warning message box
-            messagebox.showwarning("Warning", "Number of iterations must be an integer!")
-            return
-        delta_f = float(self.delta_f_entry.get())
+        if method != 'linear':
+            try:
+                number_of_iterations = int(self.num_iterations_entry.get())
+                delta_f = float(self.delta_f_entry.get())
+            except ValueError as e:
+                # Show a warning message box
+                messagebox.showwarning("Warning", "Number of iterations must be an integer!")
+                return
+        else:
+            number_of_iterations = 0
+            delta_f = 0
+
         # Add the new load to the input_forces dictionary
         self.input_calc_param = {'calc_method': method,
                                  'number_of_iterations': number_of_iterations,
@@ -1108,19 +1121,20 @@ class TrussAnalysisApp(tk.Tk):
             return None
 
     def run_calculation(self):
-        input_parameters_calculation = [self.input_elements,
-                                        self.input_supports,
-                                        self.input_forces,
-                                        self.input_calc_param
-                                        ]
-        # calculation = Calculation(*input_parameters_calculation)
         calculation = Calculation(self.input_elements, self.input_supports, self.input_forces, self.input_calc_param)
         self.solution = calculation.return_solution()
+        if self.solution is not None and self.solution['error_linalg'] is not None:
+            messagebox.showerror("Error", f"An error occurred while solving the system of equations: "
+                                          f"{self.solution['error_linalg']}. Please check if your system is statically "
+                                          f"determined and that all truss elements are connected.")
+            return
         self.update_calculation_information()
         print('The axial forces of the linear elastic calculation are:')
         print(self.solution['axial_forces_linear'])
-        print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')
-        print(self.solution['axial_forces_nonlinear'])
+        if 'NR' in self.input_calc_param['calc_method'] or 'modNR' in self.input_calc_param['calc_method']:
+            print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')
+            print(self.input_calc_param['calc_method'])
+            print(self.solution['axial_forces_nonlinear'])
 
     def clear_all(self):
         self.canvas.delete("all")  # Clear the canvas
