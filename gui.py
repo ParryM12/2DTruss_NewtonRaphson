@@ -87,24 +87,42 @@ class TrussAnalysisApp(tk.Tk):
         main_frame = ttk.Frame(self)
         main_frame.pack(side="left", fill='y', padx=20, pady=20)
 
+        # # Canvas frame for plotting
+        # canvas_frame = ttk.Frame(self)
+        # canvas_frame.pack(side="right", fill="both", expand=True)
+
         # Canvas frame for plotting
         canvas_frame = ttk.Frame(self)
-        canvas_frame.pack(side="right", fill="both", expand=True)
+        canvas_frame.pack(side="left", fill="both", expand=True)
 
+        # New frame for plot options
+        plot_options_frame = ttk.Frame(self)
+        plot_options_frame.pack(side="left", fill='y', padx=70, pady=20, anchor='nw')
+
+        # Adding a horizontal separator on top
+        separator1 = ttk.Separator(main_frame, orient='horizontal')
+        separator1.pack(fill='x', padx=10, pady=5)
         ##############
         # Initialize buttons for saving/loading input files
-        save_load_text = tk.Label(main_frame, text="Save/Load input parameters", font=GUI_Settings.FRAME_HEADER_FONT)
-        save_load_text.pack(anchor='nw')
         # Create Frame
         save_frame = tk.Frame(main_frame)
         save_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
         # Configure the column width
-        save_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
-        save_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
+        save_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1 * 0.33)
+        save_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2 * 0.33)
+        save_frame.columnconfigure(2, minsize=GUI_Settings.FRAME_WIDTH_COL2 * 0.33)
         # Create Button
-        ttk.Button(save_frame, text="Save Data", command=self.save_to_file).grid(row=0, column=0, padx=10, pady=10)
-        ttk.Button(save_frame, text="Load Data", command=self.load_from_file).grid(row=0, column=1, padx=10, pady=10)
+        ttk.Button(save_frame, text="Save Data", command=self.save_to_file).grid(row=0, column=0, padx=10, pady=0,
+                                                                                 sticky='w')
+        ttk.Button(save_frame, text="Load Data", command=self.load_from_file).grid(row=0, column=1, padx=10, pady=0,
+                                                                                   sticky='w')
+        ttk.Button(save_frame, text="Clear all", command=self.clear_all).grid(row=0, column=2, padx=10, pady=0,
+                                                                              sticky='w')
         #############
+
+        # Adding a horizontal separator
+        separator1 = ttk.Separator(main_frame, orient='horizontal')
+        separator1.pack(fill='x', padx=10, pady=5)
 
         # Initialize forms for input parameters
         input_param_text = tk.Label(main_frame, text="Input parameters", font=GUI_Settings.FRAME_HEADER_FONT)
@@ -113,6 +131,15 @@ class TrussAnalysisApp(tk.Tk):
         self.add_supports_form(main_frame)
         self.add_loads_form(main_frame)
         self.calculation_settings_form(main_frame)
+
+        # Adding a horizontal separator
+        separator1 = ttk.Separator(main_frame, orient='horizontal')
+        separator1.pack(fill='x', padx=10, pady=5)
+        ##############
+        # Calculation button
+        ttk.Button(main_frame, text="Run Calculation", command=self.run_calculation).pack(pady=10)
+        separator1 = ttk.Separator(main_frame, orient='horizontal')
+        separator1.pack(fill='x', padx=10, pady=5)
 
         # Canvas for displaying results
         canvas_text = tk.Label(canvas_frame, text="System and results", font=GUI_Settings.FRAME_HEADER_FONT)
@@ -134,28 +161,6 @@ class TrussAnalysisApp(tk.Tk):
         self.canvas.create_line(start_x, start_y, start_x, start_y + arrow_length, arrow=tk.LAST)
         self.canvas.create_text(start_x, start_y + arrow_length + 10, text="y", anchor="center", width=1.5,
                                 font=GUI_Settings.ITALIC_FONT_1)
-
-        ##############
-        # Initialize buttons for running/clearing the calculation
-        calculation_text = tk.Label(main_frame, text="Run Calculation/Clear all", font=GUI_Settings.FRAME_HEADER_FONT)
-        calculation_text.pack(anchor='nw')
-        # Create Frame
-        calc_frame = tk.Frame(main_frame)
-        calc_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
-        # Configure the column width
-        calc_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
-        calc_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
-        # Create Button
-        ttk.Button(calc_frame, text="Run Calculation", command=self.run_calculation).grid(row=0, column=0, padx=10,
-                                                                                          pady=10)
-        ttk.Button(calc_frame, text="Clear all", command=self.clear_all).grid(row=0, column=1, padx=10, pady=10)
-        #############
-
-        # # Calculation button
-        # ttk.Button(main_frame, text="Run Calculation", command=self.run_calculation).pack(pady=10)
-        #
-        # # Clear button
-        # ttk.Button(main_frame, text="Clear all", command=self.clear_all).pack(pady=10)
 
         # Add Icon
         # icon_image = ImageTk.PhotoImage(data=GUI_Settings.return_icon_bytestring())
@@ -209,6 +214,63 @@ class TrussAnalysisApp(tk.Tk):
 
         # Attach the scrollbar to the Text widget
         self.current_calculation_information.config(yscrollcommand=scrollbar_calcinfo.set)
+
+        # Plot options #
+        plot_options_text = tk.Label(plot_options_frame, text="Plot options", font=GUI_Settings.FRAME_HEADER_FONT)
+        plot_options_text.pack(anchor='nw')
+
+        # Create Frame for plotting the system
+        plot_system_frame = ttk.LabelFrame(plot_options_frame, text='Plot system')
+        plot_system_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
+        # Configure the column width
+        plot_system_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1 * 0.5)
+        plot_system_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL1 * 0.5)
+        # Button and settings for plotting system with supports and loads
+        ttk.Label(plot_system_frame, text="Show grid:").grid(row=0, column=0, sticky='w')
+        self.show_grid = ttk.Checkbutton(plot_system_frame)
+        self.show_grid.grid(row=0, column=1)
+        ttk.Label(plot_system_frame, text="Label nodes:").grid(row=1, column=0, sticky='w')
+        self.label_nodes = ttk.Checkbutton(plot_system_frame)
+        self.label_nodes.grid(row=1, column=1)
+        ttk.Label(plot_system_frame, text="Label elements:").grid(row=2, column=0, sticky='w')
+        self.label_elements = ttk.Checkbutton(plot_system_frame)
+        self.label_elements.grid(row=2, column=1, )
+        ttk.Button(plot_system_frame, text="Plot system", command=self.plot_system).grid(row=3, column=0, columnspan=2,
+                                                                                         pady=5, padx=10, sticky='ew')
+
+        # Create Frame for plotting the results of the linear calculation
+        plot_linear_frame = ttk.LabelFrame(plot_options_frame, text='Linear calculation')
+        plot_linear_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
+        # Button for plotting system and deformed system in red
+        self.plot_linear_deformation = ttk.Button(plot_linear_frame, text="Plot deformed system",
+                                                  command=self.plot_system, state='disabled')
+        self.plot_linear_deformation.pack(padx=10, pady=7, fill='x')
+        # Button for plotting system and axial forces
+        self.plot_linear_forces = ttk.Button(plot_linear_frame, text="Plot axial forces", command=self.plot_system,
+                                             state='disabled')
+        self.plot_linear_forces.pack(padx=10, pady=7, fill='x')
+
+        # Create Frame for plotting the results of the nonlinear calculation
+        plot_nonlinear_frame = ttk.LabelFrame(plot_options_frame, text='Nonlinear calculation')
+        plot_nonlinear_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
+        # Button for plotting system and deformed system in red
+        self.plot_nonlinear_deformation = ttk.Button(plot_nonlinear_frame, text="Plot deformed system",
+                                                     command=self.plot_system, state='disabled')
+        self.plot_nonlinear_deformation.pack(padx=10, pady=7, fill='x')
+        # Button for plotting system and axial forces
+        self.plot_nonlinear_forces = ttk.Button(plot_nonlinear_frame, text="Plot axial forces",
+                                                command=self.plot_system, state='disabled')
+        self.plot_nonlinear_forces.pack(padx=10, pady=7, fill='x')
+        # Adding a horizontal separator
+        separator1 = ttk.Separator(plot_options_frame, orient='horizontal')
+        separator1.pack(fill='x', padx=10, pady=5)
+        # Button to export the current plot
+        self.export_plot = ttk.Button(plot_options_frame, text="Export plot", command=self.plot_system,
+                                      state='disabled')
+        self.export_plot.pack(padx=10, pady=7, fill='x')
+        # Adding a horizontal separator
+        separator1 = ttk.Separator(plot_options_frame, orient='horizontal')
+        separator1.pack(fill='x', padx=10, pady=5)
 
     def update_system_information(self):
         info_text = "Current System Information:\n"
@@ -1198,27 +1260,56 @@ class TrussAnalysisApp(tk.Tk):
         if file_path:
             with open(file_path, 'w') as file:
                 json.dump(data, file, indent=4)
-            messagebox.showinfo("Save File", "Information successfully saved to file.")
+            messagebox.showinfo("Save File", "Input parameters successfully saved to file.")
 
     def load_from_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
         if file_path:
             with open(file_path, 'r') as file:
                 data = json.load(file)
-            self.input_elements = data['input_elements']
-            self.input_supports = data['input_supports']
-            self.input_forces = data['input_forces']
-            self.input_calc_param = data['input_calc_param']
+            # Convert lists back to tuples for nodes
+            if 'input_elements' in data:
+                self.add_element_initialise = 1
+                for key, element in data['input_elements'].items():
+                    if 'ele_node_i' in element:
+                        element['ele_node_i'] = tuple(element['ele_node_i'])
+                    if 'ele_node_j' in element:
+                        element['ele_node_j'] = tuple(element['ele_node_j'])
+
+            if 'input_supports' in data:
+                self.add_support_initialise = 1
+                for key, support in data['input_supports'].items():
+                    if 'sup_node' in support:
+                        support['sup_node'] = tuple(support['sup_node'])
+
+            if 'input_forces' in data:
+                self.add_load_initialise = 1
+                for key, force in data['input_forces'].items():
+                    if 'force_node' in force:
+                        force['force_node'] = tuple(force['force_node'])
+            self.input_elements = data.get('input_elements', {})
+            self.input_supports = data.get('input_supports', {})
+            self.input_forces = data.get('input_forces', {})
+            self.input_calc_param = data.get('input_calc_param', {})
             # Update the UI with loaded data
             self.update_system_information()
-            self.update_calculation_information()
-            messagebox.showinfo("Load File", "Information successfully loaded from file.")
+            messagebox.showinfo("Load File", "Input parameters successfully loaded from file.")
             # Draw elements, supports and loads on canvas
             self.canvas.delete("all")  # Clear the canvas
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support()
             self.draw_load()
+
+    def plot_system(self):
+        # Clear existing canvas
+        self.canvas.delete("all")
+        # Draw coordinate system
+        self.draw_coordinate_system()
+        # Draw elements, supports, and loads
+        self.draw_element()
+        self.draw_support()
+        self.draw_load()
 
 
 # Run the application
