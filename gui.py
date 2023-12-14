@@ -4,10 +4,12 @@ from gui_settings import GUI_Settings
 import copy
 from tkinter import messagebox
 from calculation import Calculation
+import json
+from tkinter import filedialog
 
 #################################################
 # Other
-AUTHOR = 'Marius Mellmann, Elias Perras'
+AUTHOR = 'Marius Mellmann, Elias Perras, Julian Mellmann'
 VERSION_MAJOR = 1
 VERSION_MINOR = 0
 VERSION_PATCH = 0
@@ -89,7 +91,22 @@ class TrussAnalysisApp(tk.Tk):
         canvas_frame = ttk.Frame(self)
         canvas_frame.pack(side="right", fill="both", expand=True)
 
-        # Initialize forms and canvas
+        ##############
+        # Initialize buttons for saving/loading input files
+        save_load_text = tk.Label(main_frame, text="Save/Load input parameters", font=GUI_Settings.FRAME_HEADER_FONT)
+        save_load_text.pack(anchor='nw')
+        # Create Frame
+        save_frame = tk.Frame(main_frame)
+        save_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
+        # Configure the column width
+        save_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
+        save_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
+        # Create Button
+        ttk.Button(save_frame, text="Save Data", command=self.save_to_file).grid(row=0, column=0, padx=10, pady=10)
+        ttk.Button(save_frame, text="Load Data", command=self.load_from_file).grid(row=0, column=1, padx=10, pady=10)
+        #############
+
+        # Initialize forms for input parameters
         input_param_text = tk.Label(main_frame, text="Input parameters", font=GUI_Settings.FRAME_HEADER_FONT)
         input_param_text.pack(anchor='nw')
         self.add_elements_form(main_frame)
@@ -101,7 +118,7 @@ class TrussAnalysisApp(tk.Tk):
         canvas_text = tk.Label(canvas_frame, text="System and results", font=GUI_Settings.FRAME_HEADER_FONT)
         canvas_text.place(relx=0.02, rely=0.014)
         self.canvas = tk.Canvas(canvas_frame, width=GUI_Settings.screensize[0] * 0.7,
-                                height=GUI_Settings.screensize[1] * 0.6,
+                                height=GUI_Settings.screensize[1] * 0.65,
                                 bg=GUI_Settings.CANVAS_BG, highlightbackground="black", highlightthickness=1)
         self.canvas.place(relx=0.02, rely=0.04)
         # Add coordinate system to canvas
@@ -118,11 +135,27 @@ class TrussAnalysisApp(tk.Tk):
         self.canvas.create_text(start_x, start_y + arrow_length + 10, text="y", anchor="center", width=1.5,
                                 font=GUI_Settings.ITALIC_FONT_1)
 
-        # Calculation button
-        ttk.Button(main_frame, text="Run Calculation", command=self.run_calculation).pack(pady=10)
+        ##############
+        # Initialize buttons for running/clearing the calculation
+        calculation_text = tk.Label(main_frame, text="Run Calculation/Clear all", font=GUI_Settings.FRAME_HEADER_FONT)
+        calculation_text.pack(anchor='nw')
+        # Create Frame
+        calc_frame = tk.Frame(main_frame)
+        calc_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
+        # Configure the column width
+        calc_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
+        calc_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
+        # Create Button
+        ttk.Button(calc_frame, text="Run Calculation", command=self.run_calculation).grid(row=0, column=0, padx=10,
+                                                                                          pady=10)
+        ttk.Button(calc_frame, text="Clear all", command=self.clear_all).grid(row=0, column=1, padx=10, pady=10)
+        #############
 
-        # Clear button
-        ttk.Button(main_frame, text="Clear all", command=self.clear_all).pack(pady=10)
+        # # Calculation button
+        # ttk.Button(main_frame, text="Run Calculation", command=self.run_calculation).pack(pady=10)
+        #
+        # # Clear button
+        # ttk.Button(main_frame, text="Clear all", command=self.clear_all).pack(pady=10)
 
         # Add Icon
         # icon_image = ImageTk.PhotoImage(data=GUI_Settings.return_icon_bytestring())
@@ -130,12 +163,12 @@ class TrussAnalysisApp(tk.Tk):
 
         # Frame for system information and scrollbar
         sys_info_frame = tk.Frame(self)
-        sys_info_frame.place(relx=0.01, rely=0.72, relwidth=0.4, relheight=0.17)  # Adjust dimensions as needed
+        sys_info_frame.place(relx=0.01, rely=0.77, relwidth=0.4, relheight=0.17)  # Adjust dimensions as needed
 
         # Text widget for system information
         current_system_information_label = tk.Label(self, text="System Information:",
                                                     font=GUI_Settings.FRAME_HEADER_FONT)
-        current_system_information_label.place(relx=0.01, rely=0.7)
+        current_system_information_label.place(relx=0.01, rely=0.75)
         initial_system_information = f"Information about the system parameters will be displayed here."
         self.current_system_information = tk.Text(sys_info_frame, wrap=tk.WORD,
                                                   font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
@@ -153,12 +186,12 @@ class TrussAnalysisApp(tk.Tk):
 
         # Frame for calculation information and scrollbar
         calc_info_frame = tk.Frame(self)
-        calc_info_frame.place(relx=0.47, rely=0.72, relwidth=0.4, relheight=0.17)  # Adjust dimensions as needed
+        calc_info_frame.place(relx=0.47, rely=0.77, relwidth=0.4, relheight=0.17)  # Adjust dimensions as needed
 
         # Text widget for calculation information
         calculation_information_label = tk.Label(self, text="Calculation Information:",
                                                  font=GUI_Settings.FRAME_HEADER_FONT)
-        calculation_information_label.place(relx=0.47, rely=0.7)
+        calculation_information_label.place(relx=0.47, rely=0.75)
         initial_calculation_information = f"Information about the calculation will be displayed here."
         self.current_calculation_information = tk.Text(calc_info_frame, wrap=tk.WORD,
                                                        font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
@@ -460,9 +493,9 @@ class TrussAnalysisApp(tk.Tk):
         self.strain_entry.grid(row=6, column=1, sticky='ew', padx=5)
 
         # Create Button to add the element
-        ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=7, columnspan=2, pady=10)
+        ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=7, columnspan=2, pady=7)
         # Create Button to edit an element
-        ttk.Button(frame, text="Edit/Delete Element", command=self.edit_element).grid(row=8, columnspan=2, pady=0)
+        ttk.Button(frame, text="Edit/Delete Element", command=self.edit_element).grid(row=8, columnspan=2, pady=3)
 
     def add_supports_form(self, parent_frame):
         # Create Frame
@@ -487,9 +520,9 @@ class TrussAnalysisApp(tk.Tk):
         self.stiffness_cy_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
         # Create Button to add the support
-        ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=3, columnspan=2, pady=10)
+        ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=3, columnspan=2, pady=7)
         # Create Button to edit a support
-        ttk.Button(frame, text="Edit/Delete Support", command=self.edit_support).grid(row=4, columnspan=2, pady=0)
+        ttk.Button(frame, text="Edit/Delete Support", command=self.edit_support).grid(row=4, columnspan=2, pady=3)
 
     def add_loads_form(self, parent_frame):
         # Create Frame
@@ -515,9 +548,9 @@ class TrussAnalysisApp(tk.Tk):
         self.force_y_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
         # Create Button to add the load
-        ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, columnspan=2, pady=10)
+        ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, columnspan=2, pady=7)
         # Create Button to edit a load
-        ttk.Button(frame, text="Edit/Delete Load", command=self.edit_load).grid(row=4, columnspan=2, pady=0)
+        ttk.Button(frame, text="Edit/Delete Load", command=self.edit_load).grid(row=4, columnspan=2, pady=3)
 
     def calculation_settings_form(self, parent_frame):
         # Create Frame
@@ -548,7 +581,7 @@ class TrussAnalysisApp(tk.Tk):
         self.delta_f_entry = ttk.Entry(frame)
         self.delta_f_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
-        ttk.Button(frame, text="Save Settings", command=self.calc_settings).grid(row=3, columnspan=2, pady=10)
+        ttk.Button(frame, text="Save Settings", command=self.calc_settings).grid(row=3, columnspan=2, pady=7)
 
     def add_element(self):
         try:
@@ -1152,6 +1185,40 @@ class TrussAnalysisApp(tk.Tk):
         self.update_system_information()
         # Update information window
         self.update_calculation_information()
+
+    def save_to_file(self):
+        data = {
+            'input_elements': self.input_elements,
+            'input_supports': self.input_supports,
+            'input_forces': self.input_forces,
+            'input_calc_param': self.input_calc_param
+        }
+        file_path = filedialog.asksaveasfilename(defaultextension=".json",
+                                                 filetypes=[("JSON files", "*.json")])
+        if file_path:
+            with open(file_path, 'w') as file:
+                json.dump(data, file, indent=4)
+            messagebox.showinfo("Save File", "Information successfully saved to file.")
+
+    def load_from_file(self):
+        file_path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
+        if file_path:
+            with open(file_path, 'r') as file:
+                data = json.load(file)
+            self.input_elements = data['input_elements']
+            self.input_supports = data['input_supports']
+            self.input_forces = data['input_forces']
+            self.input_calc_param = data['input_calc_param']
+            # Update the UI with loaded data
+            self.update_system_information()
+            self.update_calculation_information()
+            messagebox.showinfo("Load File", "Information successfully loaded from file.")
+            # Draw elements, supports and loads on canvas
+            self.canvas.delete("all")  # Clear the canvas
+            self.draw_coordinate_system()
+            self.draw_element()
+            self.draw_support()
+            self.draw_load()
 
 
 # Run the application
