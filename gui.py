@@ -103,7 +103,7 @@ class TrussAnalysisApp(tk.Tk):
 
         # New frame for plot options
         plot_options_frame = ttk.Frame(self)
-        plot_options_frame.pack(side="left", fill='y', padx=70, pady=20, anchor='nw')
+        plot_options_frame.pack(side="left", fill='y', padx=60, pady=20, anchor='nw')
 
         # Adding a horizontal separator on top
         separator1 = ttk.Separator(main_frame, orient='horizontal')
@@ -222,6 +222,28 @@ class TrussAnalysisApp(tk.Tk):
         self.current_calculation_information.config(yscrollcommand=scrollbar_calcinfo.set)
 
         # Plot options #
+        # Adding a horizontal separator on top
+        separator11 = ttk.Separator(plot_options_frame, orient='horizontal')
+        separator11.pack(fill='x', padx=10, pady=5)
+        ##############
+        # Initialize buttons for showing info / tutorial
+        # Create Frame
+        info_frame = tk.Frame(plot_options_frame)
+        info_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
+        # Configure the column width
+        info_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1 * 0.33)
+        info_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2 * 0.33)
+        # Create Button
+        ttk.Button(info_frame, text="Info", command=self.save_to_file).grid(row=0, column=0, padx=10, pady=0,
+                                                                            sticky='w')
+        ttk.Button(info_frame, text="Tutorial", command=self.load_from_file).grid(row=0, column=1, padx=10, pady=0,
+                                                                                  sticky='w')
+        #############
+        # Adding a horizontal separator
+        separator12 = ttk.Separator(plot_options_frame, orient='horizontal')
+        separator12.pack(fill='x', padx=10, pady=5)
+
+        # Label Plot Options
         plot_options_text = tk.Label(plot_options_frame, text="Plot options", font=GUI_Settings.FRAME_HEADER_FONT)
         plot_options_text.pack(anchor='nw')
 
@@ -235,21 +257,27 @@ class TrussAnalysisApp(tk.Tk):
         ttk.Label(plot_system_frame, text="Show grid:").grid(row=0, column=0, sticky='w')
         self.show_grid = ttk.Checkbutton(plot_system_frame)
         self.show_grid.grid(row=0, column=1)
-        ttk.Label(plot_system_frame, text="Label nodes:").grid(row=1, column=0, sticky='w')
+        ttk.Label(plot_system_frame, text="Show loads:").grid(row=1, column=0, sticky='w')
+        self.show_loads = ttk.Checkbutton(plot_system_frame)
+        self.show_loads.grid(row=1, column=1)
+        ttk.Label(plot_system_frame, text="Label nodes:").grid(row=2, column=0, sticky='w')
         self.label_nodes = ttk.Checkbutton(plot_system_frame)
-        self.label_nodes.grid(row=1, column=1)
-        ttk.Label(plot_system_frame, text="Label elements:").grid(row=2, column=0, sticky='w')
+        self.label_nodes.grid(row=2, column=1)
+        ttk.Label(plot_system_frame, text="Label elements:").grid(row=3, column=0, sticky='w')
         self.label_elements = ttk.Checkbutton(plot_system_frame)
-        self.label_elements.grid(row=2, column=1, )
-        ttk.Button(plot_system_frame, text="Plot system", command=self.plot_system).grid(row=3, column=0, columnspan=2,
+        self.label_elements.grid(row=3, column=1, )
+        ttk.Button(plot_system_frame, text="Plot system", command=self.plot_system).grid(row=4, column=0, columnspan=2,
                                                                                          pady=5, padx=10, sticky='ew')
-
+        # Label Plot Results
+        plot_results_text = tk.Label(plot_options_frame, text="Plot results", font=GUI_Settings.FRAME_HEADER_FONT)
+        plot_results_text.pack(anchor='nw')
         # Create Frame for plotting the results of the linear calculation
         plot_linear_frame = ttk.LabelFrame(plot_options_frame, text='Linear calculation')
         plot_linear_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
         # Button for plotting system and deformed system in red
         self.plot_linear_deformation = ttk.Button(plot_linear_frame, text="Plot deformed system",
-                                                  command=lambda: self.plot_deformation_system(self.linear_displacement),
+                                                  command=lambda: self.plot_deformation_system(
+                                                      self.linear_displacement),
                                                   state='disabled')
         self.plot_linear_deformation.pack(padx=10, pady=7, fill='x')
         # Button for plotting system and axial forces
@@ -262,7 +290,8 @@ class TrussAnalysisApp(tk.Tk):
         plot_nonlinear_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
         # Button for plotting system and deformed system in red
         self.plot_nonlinear_deformation = ttk.Button(plot_nonlinear_frame, text="Plot deformed system",
-                                                     command=lambda: self.plot_deformation_system(self.nonlinear_displacement),
+                                                     command=lambda: self.plot_deformation_system(
+                                                         self.nonlinear_displacement),
                                                      state='disabled')
         self.plot_nonlinear_deformation.pack(padx=10, pady=7, fill='x')
         # Button for plotting system and axial forces
@@ -601,7 +630,6 @@ class TrussAnalysisApp(tk.Tk):
         # Draw coordinate system
         self.draw_coordinate_system()
 
-
         # Choose the correct set of axial forces based on calculation type
         axial_forces = self.solution.get(
             'axial_forces_linear' if calculation_type == 'linear' else 'axial_forces_nonlinear', [])
@@ -614,7 +642,7 @@ class TrussAnalysisApp(tk.Tk):
         # Scaling and normalization
         max_force = max(abs(np.array(axial_forces)))
         scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
-        force_scale = max_dimension * 0.12
+        force_scale = max_dimension * 0.14
         axial_forces_norm = axial_forces / max_force
 
         # Iterate over each element and its corresponding axial force
@@ -631,35 +659,54 @@ class TrussAnalysisApp(tk.Tk):
             axial_forces_norm_i = axial_forces_norm[element_id]
             # Differentiate between positive and negative axial forces
             if axial_forces_norm_i >= 0:
-                sign = 1
                 color = 'blue'
             else:
-                sign = -1
                 color = 'red'
-
             # Angle and offset calculation
             dx, dy = node_j[0] - node_i[0], node_j[1] - node_i[1]
             alpha = np.arctan2(dy, dx)
             beta = np.pi / 2 - alpha
             delta_x = float(force_scale * axial_forces_norm_i * np.cos(beta) * 0.5)
-            delta_y = float(- force_scale * axial_forces_norm_i * np.sin(beta) * 0.5)
-            force_plot_coordinates[1][:] = force_plot_coordinates[0][:] + sign * scale * np.array([delta_x, delta_y])
-            force_plot_coordinates[2][:] = force_plot_coordinates[3][:] + sign * scale * np.array([delta_x, delta_y])
+            delta_y = float(-force_scale * axial_forces_norm_i * np.sin(beta) * 0.5)
+            force_plot_coordinates[1][:] = force_plot_coordinates[0][:] - scale * np.array([delta_x, delta_y])
+            force_plot_coordinates[2][:] = force_plot_coordinates[3][:] - scale * np.array([delta_x, delta_y])
 
             # Calculate coordinates for placing the axial force label
             label_x = (force_plot_coordinates[1][0] + force_plot_coordinates[2][0]) / 2
             label_y = (force_plot_coordinates[1][1] + force_plot_coordinates[2][1]) / 2
+            # if force_plot_coordinates[3][1] > force_plot_coordinates[1][1] and axial_forces_norm_i >= 0:
+            #     label_x = label_x + max_dimension * 0.005 * scale
+            # else:
+            #     label_x = label_x - max_dimension * 0.04 * scale
+            # if force_plot_coordinates[3][1] < force_plot_coordinates[1][1] and axial_forces_norm_i < 0:
+            #     label_x = label_x + max_dimension * 0.005 * scale
+            # else:
+            #     label_x = label_x - max_dimension * 0.04 * scale
+            # if force_plot_coordinates[0][1] == force_plot_coordinates[3][1]:
+            #     label_x = label_x - max_dimension * 0.01 * scale
+            #     label_y = label_y - max_dimension * 0.006 * scale
+            if force_plot_coordinates[1][0] > force_plot_coordinates[0][0]:
+                label_x = label_x + max_dimension * 0.06 * scale
+            elif force_plot_coordinates[1][0] < force_plot_coordinates[0][0]:
+                label_x = label_x - max_dimension * 0.06 * scale
+            if force_plot_coordinates[1][1] > force_plot_coordinates[0][1]:
+                label_y = label_y + max_dimension * 0.01 * scale
+            elif force_plot_coordinates[1][1] < force_plot_coordinates[0][1]:
+                label_x = label_x - max_dimension * 0.01 * scale
 
             # Draw the axial forces for each element
-            self.canvas.create_line(force_plot_coordinates[0][0], force_plot_coordinates[0][1],
-                                    force_plot_coordinates[1][0], force_plot_coordinates[1][1], fill=color, width=2.5)
-            self.canvas.create_line(force_plot_coordinates[1][0], force_plot_coordinates[1][1],
-                                    force_plot_coordinates[2][0], force_plot_coordinates[2][1], fill=color, width=2.5)
-            self.canvas.create_line(force_plot_coordinates[2][0], force_plot_coordinates[2][1],
-                                    force_plot_coordinates[3][0], force_plot_coordinates[3][1], fill=color, width=2.5)
+            self.canvas.create_line(float(force_plot_coordinates[0][0]), float(force_plot_coordinates[0][1]),
+                                    float(force_plot_coordinates[1][0]), float(force_plot_coordinates[1][1]),
+                                    fill=color, width=2.5)
+            self.canvas.create_line(float(force_plot_coordinates[1][0]), float(force_plot_coordinates[1][1]),
+                                    float(force_plot_coordinates[2][0]), float(force_plot_coordinates[2][1]),
+                                    fill=color, width=2.5)
+            self.canvas.create_line(float(force_plot_coordinates[2][0]), float(force_plot_coordinates[2][1]),
+                                    float(force_plot_coordinates[3][0]), float(force_plot_coordinates[3][1]),
+                                    fill=color, width=2.5)
             # Add a label showing the magnitude of the force
-            self.canvas.create_text(label_x, label_y, text=f"{force:.2f} kN", fill=color,
-                                    font=GUI_Settings.STANDARD_FONT_1)
+            self.canvas.create_text(float(label_x), float(label_y), text=f"{force:.2f} kN", fill=color,
+                                    font=GUI_Settings.RESULTS_FONT_1)
 
         # Draw undeformed elements, supports, and loads
         self.draw_element()

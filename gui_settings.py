@@ -25,6 +25,7 @@ class GUI_Settings:
     STANDARD_FONT_2 = ('Arial', 10)
     ITALIC_FONT_1 = ("Times New Roman", 12, "italic")
     STANDARD_FONT_BUTTON = ('Arial', 10)
+    RESULTS_FONT_1 = ('Arial', 12, 'bold')
 
     # Width of columns in frames
     FRAME_WIDTH_COL1 = 170 * screensize[0] / 2560
