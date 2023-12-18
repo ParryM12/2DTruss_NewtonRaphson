@@ -254,7 +254,7 @@ class TrussAnalysisApp(tk.Tk):
         self.plot_linear_deformation.pack(padx=10, pady=7, fill='x')
         # Button for plotting system and axial forces
         self.plot_linear_forces = ttk.Button(plot_linear_frame, text="Plot axial forces",
-                                             command=self.plot_system, state='disabled')
+                                             command=lambda: self.plot_axial_forces('linear'), state='disabled')
         self.plot_linear_forces.pack(padx=10, pady=7, fill='x')
 
         # Create Frame for plotting the results of the nonlinear calculation
@@ -267,7 +267,7 @@ class TrussAnalysisApp(tk.Tk):
         self.plot_nonlinear_deformation.pack(padx=10, pady=7, fill='x')
         # Button for plotting system and axial forces
         self.plot_nonlinear_forces = ttk.Button(plot_nonlinear_frame, text="Plot axial forces",
-                                                command=self.plot_system, state='disabled')
+                                                command=lambda: self.plot_axial_forces('nonlinear'), state='disabled')
         self.plot_nonlinear_forces.pack(padx=10, pady=7, fill='x')
         # Adding a horizontal separator
         separator1 = ttk.Separator(plot_options_frame, orient='horizontal')
@@ -594,6 +594,78 @@ class TrussAnalysisApp(tk.Tk):
                                     fill="white", width=2.5)
             # Draw supports
             self.draw_support('red', displacement)
+
+    def plot_axial_forces(self, calculation_type):
+        # Clear existing canvas
+        self.canvas.delete("all")
+        # Draw coordinate system
+        self.draw_coordinate_system()
+
+
+        # Choose the correct set of axial forces based on calculation type
+        axial_forces = self.solution.get(
+            'axial_forces_linear' if calculation_type == 'linear' else 'axial_forces_nonlinear', [])
+
+        # Check if solution is available
+        if axial_forces is None or all(axial_forces) == 0:
+            messagebox.showwarning("Warning", "No axial forces data available.")
+            return
+
+        # Scaling and normalization
+        max_force = max(abs(np.array(axial_forces)))
+        scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
+        force_scale = max_dimension * 0.12
+        axial_forces_norm = axial_forces / max_force
+
+        # Iterate over each element and its corresponding axial force
+        for element_id, force in enumerate(axial_forces):
+            if force == 0:
+                continue  # Skip zero forces
+            # Get element coordinates and initialize plot coordinates
+            element = self.input_elements[str(element_id)]
+            node_i = self.scale_and_translate(*element['ele_node_i'])
+            node_j = self.scale_and_translate(*element['ele_node_j'])
+            force_plot_coordinates = np.zeros((4, 2), np.float64)
+            force_plot_coordinates[0][:] = node_i
+            force_plot_coordinates[3][:] = node_j
+            axial_forces_norm_i = axial_forces_norm[element_id]
+            # Differentiate between positive and negative axial forces
+            if axial_forces_norm_i >= 0:
+                sign = 1
+                color = 'blue'
+            else:
+                sign = -1
+                color = 'red'
+
+            # Angle and offset calculation
+            dx, dy = node_j[0] - node_i[0], node_j[1] - node_i[1]
+            alpha = np.arctan2(dy, dx)
+            beta = np.pi / 2 - alpha
+            delta_x = float(force_scale * axial_forces_norm_i * np.cos(beta) * 0.5)
+            delta_y = float(- force_scale * axial_forces_norm_i * np.sin(beta) * 0.5)
+            force_plot_coordinates[1][:] = force_plot_coordinates[0][:] + sign * scale * np.array([delta_x, delta_y])
+            force_plot_coordinates[2][:] = force_plot_coordinates[3][:] + sign * scale * np.array([delta_x, delta_y])
+
+            # Calculate coordinates for placing the axial force label
+            label_x = (force_plot_coordinates[1][0] + force_plot_coordinates[2][0]) / 2
+            label_y = (force_plot_coordinates[1][1] + force_plot_coordinates[2][1]) / 2
+
+            # Draw the axial forces for each element
+            self.canvas.create_line(force_plot_coordinates[0][0], force_plot_coordinates[0][1],
+                                    force_plot_coordinates[1][0], force_plot_coordinates[1][1], fill=color, width=2.5)
+            self.canvas.create_line(force_plot_coordinates[1][0], force_plot_coordinates[1][1],
+                                    force_plot_coordinates[2][0], force_plot_coordinates[2][1], fill=color, width=2.5)
+            self.canvas.create_line(force_plot_coordinates[2][0], force_plot_coordinates[2][1],
+                                    force_plot_coordinates[3][0], force_plot_coordinates[3][1], fill=color, width=2.5)
+            # Add a label showing the magnitude of the force
+            self.canvas.create_text(label_x, label_y, text=f"{force:.2f} kN", fill=color,
+                                    font=GUI_Settings.STANDARD_FONT_1)
+
+        # Draw undeformed elements, supports, and loads
+        self.draw_element()
+        self.draw_support('black', None)
+        # self.draw_load()
+
     def add_elements_form(self, parent_frame):
         # Create Frame
         frame = ttk.LabelFrame(parent_frame, text="Define elements")

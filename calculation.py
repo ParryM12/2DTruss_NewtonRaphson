@@ -293,7 +293,7 @@ class Calculation:
         # Return solution
         self.solution = {'nodes': self.nodes, 'node_displacements_linear': self.displacements.reshape(-1, 2),
                          'node_displacements_nonlinear': self.displacements_cor_total,
-                         'axial_forces_linear': self.axial_forces ,
+                         'axial_forces_linear': self.axial_forces,
                          'axial_forces_nonlinear': self.axial_forces_cor,
                          'node_forces_mismatch': self.f_vec_mismatch,
                          'iteration_break_number': self.iter_break_number,
