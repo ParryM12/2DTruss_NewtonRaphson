@@ -355,7 +355,13 @@ class TrussAnalysisApp(tk.Tk):
         if self.solution is not None:
             # Case: Nonlinear calculation
             if self.solution['node_displacements_nonlinear'] is not None:
-                # Node Displacements
+                # Node Displacements - Linear Calculation
+                info_text += "\nNode Displacements (Linear Calculation):\n"
+                for node, displacement in enumerate(self.solution['node_displacements_linear']):
+                    info_text += (f"Node {node}: u = {round(displacement[0] * 1000, 3)} mm, w = "
+                                  f"{round(displacement[1] * 1000, 2)} mm.\n")
+
+                # Node Displacements - Nonlinear Calculation
                 info_text += "\nNode Displacements (Nonlinear Calculation):\n"
                 for node, displacement in enumerate(self.solution['node_displacements_nonlinear']):
                     info_text += (f"Node {node}: u = {round(displacement[0] * 1000, 3)} mm, w = "
@@ -461,8 +467,9 @@ class TrussAnalysisApp(tk.Tk):
     def draw_element(self):
         # Draw Elements (Truss Members)
         for element in self.input_elements.values():
-            scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
-            hinge_radius = 0.006 * max_dimension * scale
+            # TODO implement dependency on screensize for the hinge_radius?
+            # hinge_radius = 0.006 * max_dimension * scale
+            hinge_radius = 7
             node_i = self.scale_and_translate(*element['ele_node_i'])
             node_j = self.scale_and_translate(*element['ele_node_j'])
             # Draw the line representing the truss element
@@ -484,18 +491,23 @@ class TrussAnalysisApp(tk.Tk):
                 node = self.scale_and_translate(*support['sup_node'])
             else:
                 # Deformation scale factor
-                scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
+                # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
                 max_displacement = np.max(abs(displacement))
-                deformation_scale = max_dimension * 0.1 / max_displacement
+                # deformation_scale = max_dimension * 0.1 / max_displacement
+                deformation_scale = 0.4 / max_displacement
                 node0 = support['sup_node']
                 node_index = int(self.node_to_index[support['sup_node']])
                 node_displacement = displacement[node_index]
                 node = self.scale_and_translate(*(node0 + node_displacement * deformation_scale))
-            scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
-            hinge_radius = 0.05 * scale
+            # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
+            # TODO implement dependency on screensize for the hinge_radius, dxy and dxy_hline?
+            # hinge_radius = 0.006 * max_dimension * scale
+            hinge_radius = 7
             x, y = node
-            dxy = 0.2 * scale  # Defines the size of the plotted support
-            dxy_hline = 0.25 * scale  # Defines the size of the horizontal line of
+            # dxy = 0.2 * scale  # Defines the size of the plotted support
+            # dxy_hline = 0.25 * scale  # Defines the size of the horizontal line of
+            dxy = 29  # Defines the size of the plotted support
+            dxy_hline = 36  # Defines the size of the horizontal line of
             # Support fixed in x- and y- direction:
             if support['c_x'] == 1 and support['c_y'] == 1:
                 points = [(x, y), (x - dxy, y + dxy), (x + dxy, y + dxy), (x, y)]
@@ -529,16 +541,20 @@ class TrussAnalysisApp(tk.Tk):
                                     width=2.5)
 
     def draw_load(self):
-        scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
+        # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
         arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed.
         # Draw Loads
-        dxy = 0.09 * scale  # Defines the distance of the force vector to the corresponding node
+        # dxy = 0.09 * scale  # Defines the distance of the force vector to the corresponding node
+        dxy = 18
         for load in self.input_forces.values():
             node = self.scale_and_translate(*load['force_node'])
             f_x, f_y = load['f_x'], load['f_y']
             self.max_force = max(self.max_force, abs(f_x), abs(f_y))
-            scale_fx = abs(f_x / self.max_force * scale) * max_dimension / 10
-            scale_fy = abs(f_y / self.max_force * scale) * max_dimension / 10
+            # TODO: Implement dependency of scale_fx and scale_fy on the screensize?
+            # scale_fx = abs(f_x / self.max_force * scale) * max_dimension / 10
+            # scale_fy = abs(f_y / self.max_force * scale) * max_dimension / 10
+            scale_fx = abs(f_x / self.max_force) * 120
+            scale_fy = abs(f_y / self.max_force) * 120
             if f_x != 0:
                 if f_x > 0:
                     self.canvas.create_line(node[0] + dxy, node[1], node[0] + scale_fx, node[1], arrow=tk.LAST,
@@ -547,8 +563,10 @@ class TrussAnalysisApp(tk.Tk):
                     self.canvas.create_line(node[0] + scale_fx, node[1], node[0] + dxy, node[1], arrow=tk.LAST,
                                             width=2.5, fill="blue", arrowshape=arrow_shape)
                 f_x_label = f"H = {abs(f_x)} kN"
-                label_offset_x = 0.08 * scale
-                label_offset_y = -0.1 * scale
+                # label_offset_x = 0.08 * scale
+                # label_offset_y = -0.1 * scale
+                label_offset_x = 11.7
+                label_offset_y = -14.6
                 self.canvas.create_text(node[0] + scale_fx + label_offset_x, node[1] + label_offset_y,
                                         text=f_x_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
             if f_y != 0:
@@ -559,8 +577,10 @@ class TrussAnalysisApp(tk.Tk):
                     self.canvas.create_line(node[0], node[1] - dxy, node[0], node[1] - scale_fy, arrow=tk.LAST,
                                             width=2.5, fill="blue", arrowshape=arrow_shape)
                 f_y_label = f"F = {abs(f_y)} kN"
-                label_offset_x = 0.05 * scale
-                label_offset_y = -0.09 * scale
+                # label_offset_x = 0.05 * scale
+                # label_offset_y = -0.09 * scale
+                label_offset_x = 7.3
+                label_offset_y = -13.1
                 self.canvas.create_text(node[0] + label_offset_x, node[1] - scale_fy + label_offset_y,
                                         text=f_y_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
 
@@ -575,14 +595,16 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_load()
 
         # Deformation scale factor and max displacements
-        scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
+        # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
         max_displacement = np.max(abs(displacement))
         max_u_index = max(range(len(displacement)), key=lambda i: abs(displacement[i][0]))
         max_w_index = max(range(len(displacement)), key=lambda i: abs(displacement[i][1]))
         max_displacement_u = displacement[max_u_index][0] * 1000
         max_displacement_w = displacement[max_w_index][1] * 1000
-        deformation_scale = max_dimension * 0.1 / max_displacement
-        hinge_radius = 0.006 * max_dimension * scale
+        # deformation_scale = max_dimension * 0.1 / max_displacement
+        deformation_scale = 0.4 / max_displacement
+        # hinge_radius = 0.006 * max_dimension * scale
+        hinge_radius = 7
 
         # Displaying the text on the canvas
         text = (f"Max. displacements: \nu = {max_displacement_u:.2f} mm (node {max_u_index})\nw = "
@@ -596,8 +618,8 @@ class TrussAnalysisApp(tk.Tk):
             node_j_index = int(self.node_to_index[element['ele_node_j']])
 
             # Get the displacements for the nodes
-            u_i, v_i = self.solution['node_displacements_linear'][node_i_index]
-            u_j, v_j = self.solution['node_displacements_linear'][node_j_index]
+            u_i, v_i = displacement[node_i_index]
+            u_j, v_j = displacement[node_j_index]
 
             # Scale the displacements
             u_i_scaled, v_i_scaled = u_i * deformation_scale, v_i * deformation_scale
@@ -642,7 +664,8 @@ class TrussAnalysisApp(tk.Tk):
         # Scaling and normalization
         max_force = max(abs(np.array(axial_forces)))
         scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
-        force_scale = max_dimension * 0.14
+        # force_scale = max_dimension * 0.14
+        force_scale = 0.4
         axial_forces_norm = axial_forces / max_force
 
         # Iterate over each element and its corresponding axial force
@@ -666,8 +689,8 @@ class TrussAnalysisApp(tk.Tk):
             dx, dy = node_j[0] - node_i[0], node_j[1] - node_i[1]
             alpha = np.arctan2(dy, dx)
             beta = np.pi / 2 - alpha
-            delta_x = float(force_scale * axial_forces_norm_i * np.cos(beta) * 0.5)
-            delta_y = float(-force_scale * axial_forces_norm_i * np.sin(beta) * 0.5)
+            delta_x = float(force_scale * axial_forces_norm_i * np.cos(beta))
+            delta_y = float(-force_scale * axial_forces_norm_i * np.sin(beta))
             force_plot_coordinates[1][:] = force_plot_coordinates[0][:] - scale * np.array([delta_x, delta_y])
             force_plot_coordinates[2][:] = force_plot_coordinates[3][:] - scale * np.array([delta_x, delta_y])
 
@@ -686,13 +709,17 @@ class TrussAnalysisApp(tk.Tk):
             #     label_x = label_x - max_dimension * 0.01 * scale
             #     label_y = label_y - max_dimension * 0.006 * scale
             if force_plot_coordinates[1][0] > force_plot_coordinates[0][0]:
-                label_x = label_x + max_dimension * 0.06 * scale
+                # label_x = label_x + max_dimension * 0.06 * scale
+                label_x = label_x + 70
             elif force_plot_coordinates[1][0] < force_plot_coordinates[0][0]:
-                label_x = label_x - max_dimension * 0.06 * scale
+                # label_x = label_x - max_dimension * 0.06 * scale
+                label_x = label_x - 70
             if force_plot_coordinates[1][1] > force_plot_coordinates[0][1]:
-                label_y = label_y + max_dimension * 0.01 * scale
+                # label_y = label_y + max_dimension * 0.01 * scale
+                label_y = label_y + 12
             elif force_plot_coordinates[1][1] < force_plot_coordinates[0][1]:
-                label_x = label_x - max_dimension * 0.01 * scale
+                # label_x = label_x - max_dimension * 0.01 * scale
+                label_y = label_y - 20
 
             # Draw the axial forces for each element
             self.canvas.create_line(float(force_plot_coordinates[0][0]), float(force_plot_coordinates[0][1]),
