@@ -11,7 +11,8 @@ class GUI_Settings:
     """
     # Define screen size
     user32 = ctypes.windll.user32
-    screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+    # screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+    screensize = 1920, round(1080 * 0.93)
 
     # colors
     CANVAS_BORDER_COLOR = '#5F1010'  # Rosewood
@@ -28,8 +29,8 @@ class GUI_Settings:
     RESULTS_FONT_1 = ('Arial', 12, 'bold')
 
     # Width of columns in frames
-    FRAME_WIDTH_COL1 = 170 * screensize[0] / 2560
-    FRAME_WIDTH_COL2 = 150 * screensize[0] / 2560
+    FRAME_WIDTH_COL1 = 170
+    FRAME_WIDTH_COL2 = 155
     # WIDTH_ENTRY = 20
     # ICON as bytestring
     @staticmethod

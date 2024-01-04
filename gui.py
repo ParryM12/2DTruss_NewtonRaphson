@@ -150,7 +150,7 @@ class TrussAnalysisApp(tk.Tk):
         # Canvas for displaying results
         canvas_text = tk.Label(canvas_frame, text="System and results", font=GUI_Settings.FRAME_HEADER_FONT)
         canvas_text.place(relx=0.02, rely=0.014)
-        self.canvas = tk.Canvas(canvas_frame, width=GUI_Settings.screensize[0] * 0.7,
+        self.canvas = tk.Canvas(canvas_frame, width=GUI_Settings.screensize[0] * 0.62,
                                 height=GUI_Settings.screensize[1] * 0.65,
                                 bg=GUI_Settings.CANVAS_BG, highlightbackground="black", highlightthickness=1)
         self.canvas.place(relx=0.02, rely=0.04)
@@ -174,12 +174,12 @@ class TrussAnalysisApp(tk.Tk):
 
         # Frame for system information and scrollbar
         sys_info_frame = tk.Frame(self)
-        sys_info_frame.place(relx=0.01, rely=0.77, relwidth=0.4, relheight=0.17)  # Adjust dimensions as needed
+        sys_info_frame.place(relx=0.215, rely=0.75, relwidth=0.37, relheight=0.17)  # Adjust dimensions as needed
 
         # Text widget for system information
         current_system_information_label = tk.Label(self, text="System Information:",
                                                     font=GUI_Settings.FRAME_HEADER_FONT)
-        current_system_information_label.place(relx=0.01, rely=0.75)
+        current_system_information_label.place(relx=0.215, rely=0.72)
         initial_system_information = f"Information about the system parameters will be displayed here."
         self.current_system_information = tk.Text(sys_info_frame, wrap=tk.WORD,
                                                   font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
@@ -197,12 +197,12 @@ class TrussAnalysisApp(tk.Tk):
 
         # Frame for calculation information and scrollbar
         calc_info_frame = tk.Frame(self)
-        calc_info_frame.place(relx=0.47, rely=0.77, relwidth=0.4, relheight=0.17)  # Adjust dimensions as needed
+        calc_info_frame.place(relx=0.6, rely=0.75, relwidth=0.37, relheight=0.17)  # Adjust dimensions as needed
 
         # Text widget for calculation information
         calculation_information_label = tk.Label(self, text="Calculation Information:",
                                                  font=GUI_Settings.FRAME_HEADER_FONT)
-        calculation_information_label.place(relx=0.47, rely=0.75)
+        calculation_information_label.place(relx=0.6, rely=0.72)
         initial_calculation_information = f"Information about the calculation will be displayed here."
         self.current_calculation_information = tk.Text(calc_info_frame, wrap=tk.WORD,
                                                        font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
@@ -229,7 +229,7 @@ class TrussAnalysisApp(tk.Tk):
         # Initialize buttons for showing info / tutorial
         # Create Frame
         info_frame = tk.Frame(plot_options_frame)
-        info_frame.pack(padx=10, pady=10, fill='x', anchor='nw')
+        info_frame.pack(padx=0, pady=10, fill='x', anchor='nw')
         # Configure the column width
         info_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1 * 0.33)
         info_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2 * 0.33)
