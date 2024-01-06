@@ -9,6 +9,8 @@ from tkinter import messagebox
 from calculation import Calculation
 import json
 from tkinter import filedialog
+import pyautogui
+
 
 #################################################
 # Other
@@ -16,6 +18,8 @@ AUTHOR = 'Marius Mellmann, Elias Perras, Julian Mellmann'
 VERSION_MAJOR = 1
 VERSION_MINOR = 0
 VERSION_PATCH = 0
+RELEASE_DATE = '06.01.2024'
+CONTACT = 'info@pum-consulting.de'
 
 
 #################################################
@@ -151,7 +155,7 @@ class TrussAnalysisApp(tk.Tk):
         canvas_text = tk.Label(canvas_frame, text="System and results", font=GUI_Settings.FRAME_HEADER_FONT)
         canvas_text.place(relx=0.02, rely=0.014)
         self.canvas = tk.Canvas(canvas_frame, width=GUI_Settings.screensize[0] * 0.62,
-                                height=GUI_Settings.screensize[1] * 0.65,
+                                height=GUI_Settings.screensize[1] * 0.7,
                                 bg=GUI_Settings.CANVAS_BG, highlightbackground="black", highlightthickness=1)
         self.canvas.place(relx=0.02, rely=0.04)
         # Add coordinate system to canvas
@@ -174,12 +178,12 @@ class TrussAnalysisApp(tk.Tk):
 
         # Frame for system information and scrollbar
         sys_info_frame = tk.Frame(self)
-        sys_info_frame.place(relx=0.215, rely=0.75, relwidth=0.37, relheight=0.17)  # Adjust dimensions as needed
+        sys_info_frame.place(relx=0.215, rely=0.79, relwidth=0.41, relheight=0.17)  # Adjust dimensions as needed
 
         # Text widget for system information
         current_system_information_label = tk.Label(self, text="System Information:",
                                                     font=GUI_Settings.FRAME_HEADER_FONT)
-        current_system_information_label.place(relx=0.215, rely=0.72)
+        current_system_information_label.place(relx=0.215, rely=0.76)
         initial_system_information = f"Information about the system parameters will be displayed here."
         self.current_system_information = tk.Text(sys_info_frame, wrap=tk.WORD,
                                                   font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
@@ -197,12 +201,12 @@ class TrussAnalysisApp(tk.Tk):
 
         # Frame for calculation information and scrollbar
         calc_info_frame = tk.Frame(self)
-        calc_info_frame.place(relx=0.6, rely=0.75, relwidth=0.37, relheight=0.17)  # Adjust dimensions as needed
+        calc_info_frame.place(relx=0.64, rely=0.79, relwidth=0.33, relheight=0.17)  # Adjust dimensions as needed
 
         # Text widget for calculation information
         calculation_information_label = tk.Label(self, text="Calculation Information:",
                                                  font=GUI_Settings.FRAME_HEADER_FONT)
-        calculation_information_label.place(relx=0.6, rely=0.72)
+        calculation_information_label.place(relx=0.64, rely=0.76)
         initial_calculation_information = f"Information about the calculation will be displayed here."
         self.current_calculation_information = tk.Text(calc_info_frame, wrap=tk.WORD,
                                                        font=GUI_Settings.STANDARD_FONT_2, bg='light gray', fg='black')
@@ -234,10 +238,10 @@ class TrussAnalysisApp(tk.Tk):
         info_frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1 * 0.33)
         info_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2 * 0.33)
         # Create Button
-        ttk.Button(info_frame, text="Info", command=self.save_to_file).grid(row=0, column=0, padx=10, pady=0,
+        ttk.Button(info_frame, text="Info", command=self.display_info).grid(row=0, column=0, padx=10, pady=0,
                                                                             sticky='w')
-        ttk.Button(info_frame, text="Tutorial", command=self.load_from_file).grid(row=0, column=1, padx=10, pady=0,
-                                                                                  sticky='w')
+        ttk.Button(info_frame, text="Tutorial", command=self.display_tutorial).grid(row=0, column=1, padx=10, pady=0,
+                                                                                    sticky='w')
         #############
         # Adding a horizontal separator
         separator12 = ttk.Separator(plot_options_frame, orient='horizontal')
@@ -302,12 +306,80 @@ class TrussAnalysisApp(tk.Tk):
         separator1 = ttk.Separator(plot_options_frame, orient='horizontal')
         separator1.pack(fill='x', padx=10, pady=5)
         # Button to export the current plot
-        self.export_plot = ttk.Button(plot_options_frame, text="Export plot", command=self.plot_system,
+        self.export_plot = ttk.Button(plot_options_frame, text="Export plot", command=self.export_canvas,
                                       state='disabled')
         self.export_plot.pack(padx=10, pady=7, fill='x')
         # Adding a horizontal separator
         separator1 = ttk.Separator(plot_options_frame, orient='horizontal')
         separator1.pack(fill='x', padx=10, pady=5)
+
+    def display_info(self):
+        # Create a top-level window
+        info_window = tk.Toplevel(self)
+        info_window.title("Information")
+
+        # Display the information
+        info_text = ("Truss FEM is a non commercial FEM software to calculate the axial forces and displacements of \n"
+                     "linear and nonlinear truss structures. We assume no liability for errors of any kind.\n"
+                     "If you find any errors or have suggestions for improvement, please feel free to contact us.\n")
+        info_text += f"\nAuthors: {AUTHOR}\n"
+        info_text += f"Contact: {CONTACT}\n"
+        info_text += f"Version: {VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_PATCH}"
+        info_text += f"\nRelease: {RELEASE_DATE}\n"
+        tk.Label(info_window, text=info_text, justify=tk.LEFT).pack(padx=10, pady=10)
+
+    def display_tutorial(self):
+        # Create a top-level window
+        info_window = tk.Toplevel(self)
+        info_window.title("Tutorial")
+
+        # Display the information
+        tutorial_text = "TUTORIAL - Work in progress :("
+        tk.Label(info_window, text=tutorial_text, justify=tk.LEFT).pack(padx=10, pady=10)
+
+    # def export_canvas(self):
+    #     # Get the canvas dimensions
+    #     canvas_width = self.canvas.winfo_width()
+    #     canvas_height = self.canvas.winfo_height()
+    #
+    #     # Create an empty PIL image and draw the canvas content
+    #     image = Image.new("RGB", (canvas_width, canvas_height), color="white")
+    #     draw = ImageDraw.Draw(image)
+    #
+    #     # Save the current canvas postscript in a temporary file
+    #     ps = self.canvas.postscript(colormode='color')
+    #     temp_file = "temp_canvas.eps"
+    #     with open(temp_file, "w") as file:
+    #         file.write(ps)
+    #
+    #     # Use PIL to convert to a raster image (like PNG)
+    #     temp_image = Image.open(temp_file)
+    #     image.paste(temp_image)
+    #
+    #     # Ask the user for a file name and type to save the image
+    #     filetypes = [("JPEG", "*.jpg"), ("PNG", "*.png")]
+    #     filepath = filedialog.asksaveasfilename(filetypes=filetypes, defaultextension=filetypes[0][0])
+    #
+    #     if filepath:
+    #         image.save(filepath)
+    #
+    #     # Clean up temporary files
+    #     temp_image.close()
+    #     os.remove(temp_file)
+
+    def export_canvas(self):
+        # Get canvas bounds
+        x = self.canvas.winfo_rootx()
+        y = self.canvas.winfo_rooty()
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+
+        # Ask the user for a file name to save the image
+        filepath = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png")])
+
+        if filepath:
+            screenshot = pyautogui.screenshot(region=(x, y, width, height))
+            screenshot.save(filepath)
 
     def update_system_information(self):
         info_text = "Current System Information:\n"
@@ -450,8 +522,8 @@ class TrussAnalysisApp(tk.Tk):
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
 
-        scale_x = canvas_width / truss_width if truss_width != 0 else 1
-        scale_y = canvas_height / truss_height if truss_height != 0 else 1
+        scale_x = canvas_width / (truss_width if truss_width != 0 else 1)
+        scale_y = canvas_height / (truss_height if truss_height != 0 else 1)
 
         scale = min(scale_x, scale_y) * 0.65  # 0.8 for padding
 
@@ -467,8 +539,6 @@ class TrussAnalysisApp(tk.Tk):
     def draw_element(self):
         # Draw Elements (Truss Members)
         for element in self.input_elements.values():
-            # TODO implement dependency on screensize for the hinge_radius?
-            # hinge_radius = 0.006 * max_dimension * scale
             hinge_radius = 7
             node_i = self.scale_and_translate(*element['ele_node_i'])
             node_j = self.scale_and_translate(*element['ele_node_j'])
@@ -499,13 +569,8 @@ class TrussAnalysisApp(tk.Tk):
                 node_index = int(self.node_to_index[support['sup_node']])
                 node_displacement = displacement[node_index]
                 node = self.scale_and_translate(*(node0 + node_displacement * deformation_scale))
-            # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
-            # TODO implement dependency on screensize for the hinge_radius, dxy and dxy_hline?
-            # hinge_radius = 0.006 * max_dimension * scale
             hinge_radius = 7
             x, y = node
-            # dxy = 0.2 * scale  # Defines the size of the plotted support
-            # dxy_hline = 0.25 * scale  # Defines the size of the horizontal line of
             dxy = 29  # Defines the size of the plotted support
             dxy_hline = 36  # Defines the size of the horizontal line of
             # Support fixed in x- and y- direction:
@@ -544,17 +609,13 @@ class TrussAnalysisApp(tk.Tk):
         # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
         arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed.
         # Draw Loads
-        # dxy = 0.09 * scale  # Defines the distance of the force vector to the corresponding node
-        dxy = 18
+        dxy = 13
         for load in self.input_forces.values():
             node = self.scale_and_translate(*load['force_node'])
             f_x, f_y = load['f_x'], load['f_y']
             self.max_force = max(self.max_force, abs(f_x), abs(f_y))
-            # TODO: Implement dependency of scale_fx and scale_fy on the screensize?
-            # scale_fx = abs(f_x / self.max_force * scale) * max_dimension / 10
-            # scale_fy = abs(f_y / self.max_force * scale) * max_dimension / 10
-            scale_fx = abs(f_x / self.max_force) * 120
-            scale_fy = abs(f_y / self.max_force) * 120
+            scale_fx = abs(f_x / self.max_force) * 90
+            scale_fy = abs(f_y / self.max_force) * 90
             if f_x != 0:
                 if f_x > 0:
                     self.canvas.create_line(node[0] + dxy, node[1], node[0] + scale_fx, node[1], arrow=tk.LAST,
@@ -595,7 +656,6 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_load()
 
         # Deformation scale factor and max displacements
-        # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
         max_displacement = np.max(abs(displacement))
         max_u_index = max(range(len(displacement)), key=lambda i: abs(displacement[i][0]))
         max_w_index = max(range(len(displacement)), key=lambda i: abs(displacement[i][1]))
@@ -661,12 +721,24 @@ class TrussAnalysisApp(tk.Tk):
             messagebox.showwarning("Warning", "No axial forces data available.")
             return
 
+        # Displaying the text on the canvas
+        max_force = max(np.array(axial_forces))
+        min_force = min(np.array(axial_forces))
+        if calculation_type == 'linear':
+            text = (f"Axial forces N_i [kN], Linear calculation, "
+                    f"N_max = {max_force:.2f} kN, N_min = {min_force:.2f} kN")
+        else:
+            text = (f"Axial forces N_i [kN], Nonlinear calculation, "
+                    f"N_max = {max_force:.2f} kN, N_min = {min_force:.2f} kN")
+        self.canvas.create_text(self.canvas.winfo_width() - 10, 10, text=text, anchor='ne', fill="black",
+                                font=GUI_Settings.STANDARD_FONT_1)
+
         # Scaling and normalization
-        max_force = max(abs(np.array(axial_forces)))
+        max_abs_force = max(abs(np.array(axial_forces)))
         scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
         # force_scale = max_dimension * 0.14
-        force_scale = 0.4
-        axial_forces_norm = axial_forces / max_force
+        force_scale = 0.6
+        axial_forces_norm = axial_forces / max_abs_force
 
         # Iterate over each element and its corresponding axial force
         for element_id, force in enumerate(axial_forces):
@@ -697,28 +769,13 @@ class TrussAnalysisApp(tk.Tk):
             # Calculate coordinates for placing the axial force label
             label_x = (force_plot_coordinates[1][0] + force_plot_coordinates[2][0]) / 2
             label_y = (force_plot_coordinates[1][1] + force_plot_coordinates[2][1]) / 2
-            # if force_plot_coordinates[3][1] > force_plot_coordinates[1][1] and axial_forces_norm_i >= 0:
-            #     label_x = label_x + max_dimension * 0.005 * scale
-            # else:
-            #     label_x = label_x - max_dimension * 0.04 * scale
-            # if force_plot_coordinates[3][1] < force_plot_coordinates[1][1] and axial_forces_norm_i < 0:
-            #     label_x = label_x + max_dimension * 0.005 * scale
-            # else:
-            #     label_x = label_x - max_dimension * 0.04 * scale
-            # if force_plot_coordinates[0][1] == force_plot_coordinates[3][1]:
-            #     label_x = label_x - max_dimension * 0.01 * scale
-            #     label_y = label_y - max_dimension * 0.006 * scale
             if force_plot_coordinates[1][0] > force_plot_coordinates[0][0]:
-                # label_x = label_x + max_dimension * 0.06 * scale
-                label_x = label_x + 70
+                label_x = label_x + 50
             elif force_plot_coordinates[1][0] < force_plot_coordinates[0][0]:
-                # label_x = label_x - max_dimension * 0.06 * scale
-                label_x = label_x - 70
+                label_x = label_x - 50
             if force_plot_coordinates[1][1] > force_plot_coordinates[0][1]:
-                # label_y = label_y + max_dimension * 0.01 * scale
                 label_y = label_y + 12
             elif force_plot_coordinates[1][1] < force_plot_coordinates[0][1]:
-                # label_x = label_x - max_dimension * 0.01 * scale
                 label_y = label_y - 20
 
             # Draw the axial forces for each element
@@ -1448,6 +1505,7 @@ class TrussAnalysisApp(tk.Tk):
                 # Enable the plot_linear_deformation button
                 self.plot_linear_deformation.config(state='normal')
                 self.plot_linear_forces.config(state='normal')
+                self.export_plot.config(state='normal')
                 # Create a mapping from node tuples to their index in the global_nodes_list
                 self.node_to_index = {node: index for index, node in enumerate(self.solution['nodes'])}
                 # Copy linear displacements for plotting
@@ -1486,6 +1544,7 @@ class TrussAnalysisApp(tk.Tk):
         self.add_support_initialise = 0
         self.add_load_initialise = 0
         self.add_calc_initialise = 0
+        self.max_force = 1
         self.solution = None
         # Update information window
         self.update_system_information()
@@ -1507,6 +1566,7 @@ class TrussAnalysisApp(tk.Tk):
             messagebox.showinfo("Save File", "Input parameters successfully saved to file.")
 
     def load_from_file(self):
+        self.clear_all()
         file_path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
         if file_path:
             with open(file_path, 'r') as file:

@@ -240,7 +240,7 @@ class Calculation:
                     f_vec_cor[self.element_matrices[i]['DOFs']] += axial_forces_cor_glob
                 self.f_vec_mismatch = self.f_vec - f_vec_cor
                 # Calculate additional displacements
-                if 'NR' in self.calc_param['calc_method']:
+                if self.calc_param['calc_method'] in 'NR':
                     for i in range(len(self.element_matrices)):
                         ele_e_cor = (ele_lin_coeff + 2 * ele_quad_coeff * strain) * ele_e
                         element_k_local, element_k_global, element_transformation, length \
@@ -287,7 +287,7 @@ class Calculation:
         # Round output
         self.axial_forces = np.round(self.axial_forces, 2)
         if self.f_vec_mismatch is not None:
-            self.f_vec_mismatch = np.round(self.f_vec_mismatch)
+            self.f_vec_mismatch = np.round(self.f_vec_mismatch, 2)
         if self.axial_forces_cor is not None:
             self.axial_forces_cor = np.round(self.axial_forces_cor, 2)
         # Return solution
