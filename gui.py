@@ -158,19 +158,6 @@ class TrussAnalysisApp(tk.Tk):
                                 height=round(GUI_Settings.screensize[1] * 0.7),
                                 bg=GUI_Settings.CANVAS_BG, highlightbackground="black", highlightthickness=1)
         self.canvas.place(relx=0.02, rely=0.04)
-        # Add coordinate system to canvas
-        # Define starting point (top-left corner with some padding)
-        start_x, start_y = 10, 10
-        # Length of the arrows
-        arrow_length = 40
-        # Draw x-axis arrow
-        self.canvas.create_line(start_x, start_y, start_x + arrow_length, start_y, arrow=tk.LAST)
-        self.canvas.create_text(start_x + arrow_length - 5, start_y + 8, text="x", anchor="center", width=1.5,
-                                font=GUI_Settings.ITALIC_FONT_1)
-        # Draw y-axis arrow
-        self.canvas.create_line(start_x, start_y, start_x, start_y + arrow_length, arrow=tk.LAST)
-        self.canvas.create_text(start_x + 12, start_y + arrow_length - 8, text="y", anchor="center", width=1.5,
-                                font=GUI_Settings.ITALIC_FONT_1)
 
         # Add Icon
         # icon_image = ImageTk.PhotoImage(data=GUI_Settings.return_icon_bytestring())
@@ -317,6 +304,20 @@ class TrussAnalysisApp(tk.Tk):
         # Initialize grid, Schedule toggle_grid to run after the mainloop starts
         self.after(100, self.toggle_grid)  # 100 milliseconds delay
 
+        # Add coordinate system to canvas
+        # Define starting point (top-left corner with some padding)
+        start_x, start_y = 10, 10
+        # Length of the arrows
+        arrow_length = 40
+        # Draw x-axis arrow
+        self.canvas.create_line(start_x, start_y, start_x + arrow_length, start_y, arrow=tk.LAST)
+        self.canvas.create_text(start_x + arrow_length - 5, start_y + 8, text="x", anchor="center", width=1.5,
+                                font=GUI_Settings.ITALIC_FONT_1)
+        # Draw y-axis arrow
+        self.canvas.create_line(start_x, start_y, start_x, start_y + arrow_length, arrow=tk.LAST)
+        self.canvas.create_text(start_x + 12, start_y + arrow_length - 8, text="y", anchor="center", width=1.5,
+                                font=GUI_Settings.ITALIC_FONT_1)
+
     def draw_grid(self):
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
@@ -342,10 +343,6 @@ class TrussAnalysisApp(tk.Tk):
             grid_spacing = grid_spacing_init
         tick_length = 10  # Length of the ticks
 
-        # Draw horizontal and vertical center lines
-        self.canvas.create_line(center_x, 0, center_x, canvas_height, fill='black', tags='grid_line', width=2)
-        self.canvas.create_line(0, center_y, canvas_width, center_y, fill='black', tags='grid_line', width=2)
-
         # Draw grid lines, labels, and ticks
         for i in range(-range_m, range_m + 1):
             offset = i * grid_spacing
@@ -353,12 +350,14 @@ class TrussAnalysisApp(tk.Tk):
             # Horizontal grid lines and ticks
             x = center_x + offset
             self.canvas.create_line(x, 0, x, canvas_height, fill='gray', tags='grid_line')
+            self.canvas.create_line(x - offset / 2, 0, x - offset / 2, canvas_height, fill='gray79', tags='grid_line')
             self.canvas.create_line(x, center_y - tick_length // 2, x, center_y + tick_length // 2, fill='black',
                                     tags='grid_tick', width=2)
 
             # Vertical grid lines and ticks
             y = center_y + offset
             self.canvas.create_line(0, y, canvas_width, y, fill='gray', tags='grid_line')
+            self.canvas.create_line(0, y - offset / 2, canvas_width, y - offset / 2, fill='gray79', tags='grid_line')
             self.canvas.create_line(center_x - tick_length // 2, y, center_x + tick_length // 2, y, fill='black',
                                     tags='grid_tick', width=2)
             # Labels
@@ -368,6 +367,10 @@ class TrussAnalysisApp(tk.Tk):
             if i != 0:
                 self.canvas.create_text(center_x + 3, y + 3, text=f"{i * tick_spacing}m", fill='black',
                                         tags='grid_label', anchor='nw')
+
+        # Draw horizontal and vertical center lines
+        self.canvas.create_line(center_x, 0, center_x, canvas_height, fill='black', tags='grid_line', width=2)
+        self.canvas.create_line(0, center_y, canvas_width, center_y, fill='black', tags='grid_line', width=2)
 
     def clear_grid(self):
         # Remove all grid lines and labels
@@ -577,7 +580,7 @@ class TrussAnalysisApp(tk.Tk):
 
     def draw_element(self):
         # Draw grid, if selected
-        self.toggle_grid()
+        # self.toggle_grid()
         # Draw Elements (Truss Members)
         for element in self.input_elements.values():
             hinge_radius = 7
@@ -689,7 +692,7 @@ class TrussAnalysisApp(tk.Tk):
     def plot_deformation_system(self, displacement):
         # Clear existing canvas
         self.canvas.delete("all")
-        # Draw grid, if selected
+        # Create grid, if selected
         self.toggle_grid()
         # Draw coordinate system
         self.draw_coordinate_system()
@@ -752,10 +755,10 @@ class TrussAnalysisApp(tk.Tk):
     def plot_axial_forces(self, calculation_type):
         # Clear existing canvas
         self.canvas.delete("all")
-        # Draw grid, if selected
+        # Create grid, if selected
         self.toggle_grid()
-        # Draw coordinate system
-        self.draw_coordinate_system()
+        self.draw_element()
+
 
         # Choose the correct set of axial forces based on calculation type
         axial_forces = self.solution.get(
@@ -840,6 +843,8 @@ class TrussAnalysisApp(tk.Tk):
         # Draw undeformed elements, supports, and loads
         self.draw_element()
         self.draw_support('black', None)
+        # Draw coordinate system
+        self.draw_coordinate_system()
         # self.draw_load()
 
     def add_elements_form(self, parent_frame):
@@ -1023,6 +1028,8 @@ class TrussAnalysisApp(tk.Tk):
             # Draw element on canvas
             self.canvas.delete("all")  # Clear the canvas
             self.plot_button.config(state='normal')
+            # Create grid, if selected
+            self.toggle_grid()
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support('black', None)
@@ -1143,6 +1150,8 @@ class TrussAnalysisApp(tk.Tk):
         self.update_system_information()
         # Draw elements, supports and loads on canvas
         self.canvas.delete("all")  # Clear the canvas
+        # Create grid, if selected
+        self.toggle_grid()
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
@@ -1179,6 +1188,8 @@ class TrussAnalysisApp(tk.Tk):
         self.update_system_information()
         # Draw elements, supports and loads on canvas
         self.canvas.delete("all")  # Clear the canvas
+        # Create grid, if selected
+        self.toggle_grid()
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
@@ -1658,7 +1669,7 @@ class TrussAnalysisApp(tk.Tk):
             self.canvas.delete("all")  # Clear the canvas
             self.plot_button.config(state='normal')
             self.draw_coordinate_system()
-            # self.toggle_grid()
+            self.toggle_grid()
             self.draw_element()
             self.draw_support('black', None)
             self.draw_load()
@@ -1669,7 +1680,7 @@ class TrussAnalysisApp(tk.Tk):
         # Draw coordinate system
         self.draw_coordinate_system()
         # Draw elements, supports, and loads
-        # self.toggle_grid()
+        self.toggle_grid()
         self.draw_element()
         self.draw_support('black', None)
         self.draw_load()
