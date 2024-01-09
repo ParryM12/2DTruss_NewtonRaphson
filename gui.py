@@ -1,20 +1,16 @@
 import tkinter as tk
-from tkinter import ttk
-
+from tkinter import ttk, filedialog, messagebox
 import numpy as np
-
 from gui_settings import GUI_Settings
 import copy
-from tkinter import messagebox
 from calculation import Calculation
 import json
-from tkinter import filedialog
 import pyautogui
-
+from PIL import ImageTk
 
 #################################################
 # Other
-AUTHOR = 'Marius Mellmann, Elias Perras, Julian Mellmann'
+AUTHOR = 'Marius Mellmann, Elias Perras'
 VERSION_MAJOR = 1
 VERSION_MINOR = 0
 VERSION_PATCH = 0
@@ -36,6 +32,7 @@ class TrussAnalysisApp(tk.Tk):
         Constructor, inherits from tkinter
         """
         super().__init__()
+        self.set_icon(self)
         self.solution = None
         # Set title of main window
         self.title("Truss FEM - Nonlinear Truss Structure Analysis")
@@ -83,23 +80,23 @@ class TrussAnalysisApp(tk.Tk):
         self.max_force = 1
         self.linear_displacement = None
         self.nonlinear_displacement = None
+        self.nodes = []
+        self.header_text = []
         self.input_elements = copy.deepcopy(self.input_elements_init)
         self.input_supports = copy.deepcopy(self.input_supports_init)
         self.input_forces = copy.deepcopy(self.input_forces_init)
         self.input_calc_param = copy.deepcopy(self.input_calc_param_init)
 
     def init_ui(self):
-        # Adjust the size to full screen self.winfo_screenwidth()
+        print("Starting...Please wait.")  # Console output when running as .exe
+        print("DO NOT CLOSE THIS WINDOW (except to quit Truss FEM)")
+        # Adjust the size
         self.geometry(f"{GUI_Settings.screensize[0]}x{GUI_Settings.screensize[1]}")
         self.resizable(False, False)
 
         # Main frame for forms
         main_frame = ttk.Frame(self)
         main_frame.pack(side="left", fill='y', padx=20, pady=20)
-
-        # # Canvas frame for plotting
-        # canvas_frame = ttk.Frame(self)
-        # canvas_frame.pack(side="right", fill="both", expand=True)
 
         # Canvas frame for plotting
         canvas_frame = ttk.Frame(self)
@@ -158,10 +155,6 @@ class TrussAnalysisApp(tk.Tk):
                                 height=round(GUI_Settings.screensize[1] * 0.7),
                                 bg=GUI_Settings.CANVAS_BG, highlightbackground="black", highlightthickness=1)
         self.canvas.place(relx=0.02, rely=0.04)
-
-        # Add Icon
-        # icon_image = ImageTk.PhotoImage(data=GUI_Settings.return_icon_bytestring())
-        # root.tk.call('wm', 'iconphoto', root._w, icon_image)
 
         # Frame for system information and scrollbar
         sys_info_frame = tk.Frame(self)
@@ -250,16 +243,26 @@ class TrussAnalysisApp(tk.Tk):
         self.show_grid = ttk.Checkbutton(plot_system_frame, variable=self.show_grid_state, command=self.toggle_grid)
         self.show_grid.grid(row=0, column=1)
         ttk.Label(plot_system_frame, text="Show loads:").grid(row=1, column=0, sticky='w')
-        self.show_loads = ttk.Checkbutton(plot_system_frame)
+        self.show_loads_state = tk.BooleanVar(value=True)
+        self.show_loads = ttk.Checkbutton(plot_system_frame, variable=self.show_loads_state, command=self.toggle_loads)
         self.show_loads.grid(row=1, column=1)
-        ttk.Label(plot_system_frame, text="Label nodes:").grid(row=2, column=0, sticky='w')
-        self.label_nodes = ttk.Checkbutton(plot_system_frame)
-        self.label_nodes.grid(row=2, column=1)
-        ttk.Label(plot_system_frame, text="Label elements:").grid(row=3, column=0, sticky='w')
-        self.label_elements = ttk.Checkbutton(plot_system_frame)
-        self.label_elements.grid(row=3, column=1)
+        ttk.Label(plot_system_frame, text="Show header:").grid(row=2, column=0, sticky='w')
+        self.show_header_state = tk.BooleanVar(value=False)
+        self.show_header = ttk.Checkbutton(plot_system_frame, variable=self.show_header_state,
+                                           command=self.toggle_header)
+        self.show_header.grid(row=2, column=1)
+        ttk.Label(plot_system_frame, text="Label nodes:").grid(row=3, column=0, sticky='w')
+        self.show_node_labels_state = tk.BooleanVar(value=False)
+        self.label_nodes_checkbox = ttk.Checkbutton(plot_system_frame, variable=self.show_node_labels_state,
+                                                    command=self.toggle_node_labels)
+        self.label_nodes_checkbox.grid(row=3, column=1)
+        ttk.Label(plot_system_frame, text="Label elements:").grid(row=4, column=0, sticky='w')
+        self.show_element_labels_state = tk.BooleanVar(value=False)
+        self.label_elements_checkbox = ttk.Checkbutton(plot_system_frame, variable=self.show_element_labels_state,
+                                                       command=self.toggle_element_labels)
+        self.label_elements_checkbox.grid(row=4, column=1)
         self.plot_button = ttk.Button(plot_system_frame, text="Plot system", command=self.plot_system, state='disabled')
-        self.plot_button.grid(row=4, column=0, columnspan=2, pady=5, padx=10, sticky='ew')
+        self.plot_button.grid(row=5, column=0, columnspan=2, pady=5, padx=10, sticky='ew')
         # Label Plot Results
         plot_results_text = tk.Label(plot_options_frame, text="Plot results", font=GUI_Settings.FRAME_HEADER_FONT)
         plot_results_text.pack(anchor='nw')
@@ -317,6 +320,14 @@ class TrussAnalysisApp(tk.Tk):
         self.canvas.create_line(start_x, start_y, start_x, start_y + arrow_length, arrow=tk.LAST)
         self.canvas.create_text(start_x + 12, start_y + arrow_length - 8, text="y", anchor="center", width=1.5,
                                 font=GUI_Settings.ITALIC_FONT_1)
+
+    def set_icon(self, root):
+        """
+        Creates Icon from raw byte data to not need external files for creating .exe
+        :return:
+        """
+        icon_image = ImageTk.PhotoImage(data=GUI_Settings.return_icon_bytestring())
+        root.tk.call('wm', 'iconphoto', root._w, icon_image)
 
     def draw_grid(self):
         canvas_width = self.canvas.winfo_width()
@@ -387,6 +398,7 @@ class TrussAnalysisApp(tk.Tk):
     def display_info(self):
         # Create a top-level window
         info_window = tk.Toplevel(self)
+        self.set_icon(info_window)
         info_window.title("Information")
 
         # Display the information
@@ -402,6 +414,7 @@ class TrussAnalysisApp(tk.Tk):
     def display_tutorial(self):
         # Create a top-level window
         info_window = tk.Toplevel(self)
+        self.set_icon(info_window)
         info_window.title("Tutorial")
 
         # Display the information
@@ -579,8 +592,6 @@ class TrussAnalysisApp(tk.Tk):
         return x * scale + translate_x, y * scale + translate_y
 
     def draw_element(self):
-        # Draw grid, if selected
-        # self.toggle_grid()
         # Draw Elements (Truss Members)
         for element in self.input_elements.values():
             hinge_radius = 7
@@ -604,10 +615,7 @@ class TrussAnalysisApp(tk.Tk):
             if displacement is None:
                 node = self.scale_and_translate(*support['sup_node'])
             else:
-                # Deformation scale factor
-                # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
                 max_displacement = np.max(abs(displacement))
-                # deformation_scale = max_dimension * 0.1 / max_displacement
                 deformation_scale = 0.4 / max_displacement
                 node0 = support['sup_node']
                 node_index = int(self.node_to_index[support['sup_node']])
@@ -663,31 +671,97 @@ class TrussAnalysisApp(tk.Tk):
             if f_x != 0:
                 if f_x > 0:
                     self.canvas.create_line(node[0] + dxy, node[1], node[0] + scale_fx, node[1], arrow=tk.LAST,
-                                            width=2.5, fill="blue", arrowshape=arrow_shape)
+                                            width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 else:
                     self.canvas.create_line(node[0] + scale_fx, node[1], node[0] + dxy, node[1], arrow=tk.LAST,
-                                            width=2.5, fill="blue", arrowshape=arrow_shape)
+                                            width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 f_x_label = f"H = {abs(f_x)} kN"
                 # label_offset_x = 0.08 * scale
                 # label_offset_y = -0.1 * scale
                 label_offset_x = 11.7
                 label_offset_y = -14.6
                 self.canvas.create_text(node[0] + scale_fx + label_offset_x, node[1] + label_offset_y,
-                                        text=f_x_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
+                                        text=f_x_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1,
+                                        tags='load_label')
             if f_y != 0:
                 if f_y > 0:
                     self.canvas.create_line(node[0], node[1] - scale_fy, node[0], node[1] - dxy, arrow=tk.LAST,
-                                            width=2.5, fill="blue", arrowshape=arrow_shape)
+                                            width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 else:
                     self.canvas.create_line(node[0], node[1] - dxy, node[0], node[1] - scale_fy, arrow=tk.LAST,
-                                            width=2.5, fill="blue", arrowshape=arrow_shape)
+                                            width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 f_y_label = f"F = {abs(f_y)} kN"
                 # label_offset_x = 0.05 * scale
                 # label_offset_y = -0.09 * scale
                 label_offset_x = 7.3
                 label_offset_y = -13.1
                 self.canvas.create_text(node[0] + label_offset_x, node[1] - scale_fy + label_offset_y,
-                                        text=f_y_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1)
+                                        text=f_y_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1,
+                                        tags='load_label')
+
+    def clear_load(self):
+        # Remove all loads and labels
+        self.canvas.delete("load_arrow")
+        self.canvas.delete("load_label")
+
+    def toggle_loads(self):
+        if self.show_loads_state.get():
+            self.draw_load()
+        else:
+            self.clear_load()
+
+    def toggle_header(self):
+        if self.show_header_state.get():
+            self.canvas.create_text(self.canvas.winfo_width() - 10, 10, text=self.header_text, anchor='ne',
+                                    fill="black",
+                                    font=GUI_Settings.STANDARD_FONT_1, tags='header')
+        else:
+            self.canvas.delete("header")
+
+    def label_nodes(self):
+        for element in self.input_elements.values():
+            # Check and add nodes to the list if they are not already in it
+            if element['ele_node_i'] not in self.nodes:
+                self.nodes.append(element['ele_node_i'])
+            if element['ele_node_j'] not in self.nodes:
+                self.nodes.append(element['ele_node_j'])
+
+        # Create node label
+        label_offset_x = 10
+        label_offset_y = -17
+        for index, node in enumerate(self.nodes):
+            node = self.scale_and_translate(*node)
+            self.canvas.create_text(node[0] + label_offset_x, node[1] + label_offset_y,
+                                    text=f"N{index}", fill="dark orange", font=GUI_Settings.STANDARD_FONT_1,
+                                    tags='node_label')
+
+    def toggle_node_labels(self):
+        if self.show_node_labels_state.get():
+            self.label_nodes()
+        else:
+            self.canvas.delete("node_label")
+
+    def label_elements(self):
+        label_offset_x = 17
+        label_offset_y = -17
+        index = 0
+        for element in self.input_elements.values():
+            node_i = element['ele_node_i']
+            node_j = element['ele_node_j']
+            label_x = node_i[0] + (node_j[0] - node_i[0]) / 2
+            label_y = node_i[1] + (node_j[1] - node_i[1]) / 2
+            label_sign = np.sign((node_j[0] - node_i[0]) * (node_j[1] - node_i[1]))
+            label_x, label_y = self.scale_and_translate(label_x, label_y)
+            self.canvas.create_text(label_x + label_offset_x * label_sign, label_y + label_offset_y,
+                                    text=f"E{index}", fill="dark orange", font=GUI_Settings.STANDARD_FONT_1,
+                                    tags='element_label')
+            index += 1
+
+    def toggle_element_labels(self):
+        if self.show_element_labels_state.get():
+            self.label_elements()
+        else:
+            self.canvas.delete("element_label")
 
     def plot_deformation_system(self, displacement):
         # Clear existing canvas
@@ -699,7 +773,9 @@ class TrussAnalysisApp(tk.Tk):
         # Draw undeformed elements, supports, and loads
         self.draw_element()
         self.draw_support('black', None)
-        self.draw_load()
+        # self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
 
         # Deformation scale factor and max displacements
         max_displacement = np.max(abs(displacement))
@@ -713,10 +789,9 @@ class TrussAnalysisApp(tk.Tk):
         hinge_radius = 7
 
         # Displaying the text on the canvas
-        text = (f"Max. displacements: \nu = {max_displacement_u:.2f} mm (node {max_u_index})\nw = "
-                f"{max_displacement_w:.2f} mm (node {max_w_index})\nScaling factor: {deformation_scale:.2f}")
-        self.canvas.create_text(self.canvas.winfo_width() - 10, 10, text=text, anchor='ne', fill="black",
-                                font=GUI_Settings.STANDARD_FONT_1)
+        self.header_text = (f"Max. displacements: \nu = {max_displacement_u:.2f} mm (node {max_u_index})\nw = "
+                            f"{max_displacement_w:.2f} mm (node {max_w_index})\nScaling factor: {deformation_scale:.2f}")
+        self.toggle_header()
 
         # Draw deformed elements
         for element_id, element in self.input_elements.items():
@@ -757,8 +832,6 @@ class TrussAnalysisApp(tk.Tk):
         self.canvas.delete("all")
         # Create grid, if selected
         self.toggle_grid()
-        self.draw_element()
-
 
         # Choose the correct set of axial forces based on calculation type
         axial_forces = self.solution.get(
@@ -773,13 +846,12 @@ class TrussAnalysisApp(tk.Tk):
         max_force = max(np.array(axial_forces))
         min_force = min(np.array(axial_forces))
         if calculation_type == 'linear':
-            text = (f"Axial forces N_i [kN], Linear calculation, "
-                    f"N_max = {max_force:.2f} kN, N_min = {min_force:.2f} kN")
+            self.header_text = (f"Axial forces N_i [kN], Linear calculation\n"
+                                f"N_max = {max_force:.2f} kN, N_min = {min_force:.2f} kN")
         else:
-            text = (f"Axial forces N_i [kN], Nonlinear calculation, "
-                    f"N_max = {max_force:.2f} kN, N_min = {min_force:.2f} kN")
-        self.canvas.create_text(self.canvas.winfo_width() - 10, 10, text=text, anchor='ne', fill="black",
-                                font=GUI_Settings.STANDARD_FONT_1)
+            self.header_text = (f"Axial forces N_i [kN], Nonlinear calculation\n"
+                                f"N_max = {max_force:.2f} kN, N_min = {min_force:.2f} kN")
+        self.toggle_header()
 
         # Scaling and normalization
         max_abs_force = max(abs(np.array(axial_forces)))
@@ -845,7 +917,8 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_support('black', None)
         # Draw coordinate system
         self.draw_coordinate_system()
-        # self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
 
     def add_elements_form(self, parent_frame):
         # Create Frame
@@ -859,31 +932,31 @@ class TrussAnalysisApp(tk.Tk):
         # Create Entry boxes and labels for element input parameters
         ttk.Label(frame, text="Node i (x, y) [m]:").grid(row=0, column=0, sticky='w')
         self.node_i_entry = ttk.Entry(frame)
-        self.node_i_entry.grid(row=0, column=1, sticky='ew', padx=5)
+        self.node_i_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Label(frame, text="Node j (x, y) [m]:").grid(row=1, column=0, sticky='w')
         self.node_j_entry = ttk.Entry(frame)
-        self.node_j_entry.grid(row=1, column=1, sticky='ew', padx=5)
+        self.node_j_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=0)
 
         ttk.Label(frame, text="Cross-section area A [cm²]:").grid(row=2, column=0, sticky='w')
         self.area_entry = ttk.Entry(frame)
-        self.area_entry.grid(row=2, column=1, sticky='ew', padx=5)
+        self.area_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Label(frame, text="Young's modulus E [MPa]:").grid(row=3, column=0, sticky='w')
         self.emod_entry = ttk.Entry(frame)
-        self.emod_entry.grid(row=3, column=1, sticky='ew', padx=5)
+        self.emod_entry.grid(row=3, column=1, sticky='ew', padx=5, pady=0)
 
         ttk.Label(frame, text="Linear coefficient α [-]:").grid(row=4, column=0, sticky='w')
         self.lin_coeff_entry = ttk.Entry(frame)
-        self.lin_coeff_entry.grid(row=4, column=1, sticky='ew', padx=5)
+        self.lin_coeff_entry.grid(row=4, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Label(frame, text="Quadratic coefficient β [-]:").grid(row=5, column=0, sticky='w')
         self.quad_coeff_entry = ttk.Entry(frame)
-        self.quad_coeff_entry.grid(row=5, column=1, sticky='ew', padx=5)
+        self.quad_coeff_entry.grid(row=5, column=1, sticky='ew', padx=5, pady=0)
 
         ttk.Label(frame, text="Limit strain ε [-]:").grid(row=6, column=0, sticky='w')
         self.strain_entry = ttk.Entry(frame)
-        self.strain_entry.grid(row=6, column=1, sticky='ew', padx=5)
+        self.strain_entry.grid(row=6, column=1, sticky='ew', padx=5, pady=1)
 
         # Create Button to add the element
         ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=7, columnspan=2, pady=7)
@@ -902,15 +975,15 @@ class TrussAnalysisApp(tk.Tk):
         # Create Entry boxes and labels for element input parameters
         ttk.Label(frame, text="Support Node (x, y) [m]:").grid(row=0, column=0, sticky='w')
         self.support_node_entry = ttk.Entry(frame)
-        self.support_node_entry.grid(row=0, column=1, sticky='ew', padx=5)
+        self.support_node_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Label(frame, text="Stiffness c_x [kN/m]:").grid(row=1, column=0, sticky='w')
         self.stiffness_cx_entry = ttk.Entry(frame)
-        self.stiffness_cx_entry.grid(row=1, column=1, sticky='ew', padx=5)
+        self.stiffness_cx_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=0)
 
         ttk.Label(frame, text="Stiffness c_y [kN/m]:").grid(row=2, column=0, sticky='w')
         self.stiffness_cy_entry = ttk.Entry(frame)
-        self.stiffness_cy_entry.grid(row=2, column=1, sticky='ew', padx=5)
+        self.stiffness_cy_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
 
         # Create Button to add the support
         ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=3, columnspan=2, pady=7)
@@ -929,16 +1002,16 @@ class TrussAnalysisApp(tk.Tk):
         # Create Entry boxes and labels for element input parameters
         ttk.Label(frame, text="Force Node (x, y) [m]:").grid(row=0, column=0, sticky='w')
         self.force_node_entry = ttk.Entry(frame)
-        self.force_node_entry.grid(row=0, column=1, sticky='ew', padx=5)
+        self.force_node_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Label(frame, text="Force F_x [kN]:").grid(row=1, column=0, sticky='w')
         self.force_x_entry = ttk.Entry(frame)
-        self.force_x_entry.grid(row=1, column=1, sticky='ew', padx=5)
+        self.force_x_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=0)
         # self.force_x_entry.place(relx=0.9, rely=0.5)
 
         ttk.Label(frame, text="Force F_y [kN]:").grid(row=2, column=0, sticky='w')
         self.force_y_entry = ttk.Entry(frame)
-        self.force_y_entry.grid(row=2, column=1, sticky='ew', padx=5)
+        self.force_y_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
 
         # Create Button to add the load
         ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, columnspan=2, pady=7)
@@ -962,17 +1035,17 @@ class TrussAnalysisApp(tk.Tk):
 
         # Dropdown menu
         self.method_combobox = ttk.Combobox(frame, values=methods, state="readonly")
-        self.method_combobox.grid(row=0, column=1, sticky='ew', padx=5)
+        self.method_combobox.grid(row=0, column=1, sticky='ew', padx=5, pady=1)
         self.method_combobox.current(0)  # Set default selection
 
         # Create Entry boxes and labels for element calculation parameters
         ttk.Label(frame, text="Max. number of iterations [-]:").grid(row=1, column=0, sticky='w')
         self.num_iterations_entry = ttk.Entry(frame)
-        self.num_iterations_entry.grid(row=1, column=1, sticky='ew', padx=5)
+        self.num_iterations_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=0)
 
         ttk.Label(frame, text="Max. deviation ΔF_max [kN]:").grid(row=2, column=0, sticky='w')
         self.delta_f_entry = ttk.Entry(frame)
-        self.delta_f_entry.grid(row=2, column=1, sticky='ew', padx=5)
+        self.delta_f_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Button(frame, text="Save Settings", command=self.calc_settings).grid(row=3, columnspan=2, pady=7)
 
@@ -1033,7 +1106,8 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support('black', None)
-            self.draw_load()
+            self.toggle_loads()
+            self.toggle_node_labels()
 
         except Exception as e:
             # Show a warning message box
@@ -1043,6 +1117,7 @@ class TrussAnalysisApp(tk.Tk):
 
     def edit_element(self):
         self.edit_window = tk.Toplevel(self)
+        self.set_icon(self.edit_window)
         self.edit_window.title("Edit Element")
 
         # Frame for entry boxes and labels
@@ -1155,7 +1230,8 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
-        self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
         # Close window
         self.edit_window.destroy()
 
@@ -1193,7 +1269,8 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
-        self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
         # Update the combobox options and entry fields
         self.update_element_dropdown()
 
@@ -1236,12 +1313,14 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support('black', None)
-            self.draw_load()
+            self.toggle_loads()
+            self.toggle_node_labels()
         except Exception as e:
             print(f"An error occurred while adding the load: {e}")
 
     def edit_load(self):
         self.edit_window_load = tk.Toplevel(self)
+        self.set_icon(self.edit_window_load)
         self.edit_window_load.title("Edit Load")
 
         # Frame for entry boxes and labels
@@ -1316,7 +1395,8 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
-        self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
         # Close window
         self.edit_window_load.destroy()
 
@@ -1352,7 +1432,8 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
-        self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
         # Update the combobox options and entry fields
         self.update_load_dropdown()
 
@@ -1397,13 +1478,15 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support('black', None)
-            self.draw_load()
+            self.toggle_loads()
+            self.toggle_node_labels()
 
         except Exception as e:
             print(f"An error occurred while adding the support: {e}")
 
     def edit_support(self):
         self.edit_window_support = tk.Toplevel(self)
+        self.set_icon(self.edit_window_support)
         self.edit_window_support.title("Edit Support")
 
         # Frame for entry boxes and labels
@@ -1478,7 +1561,8 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
-        self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
         # Close window
         self.edit_window_support.destroy()
 
@@ -1514,7 +1598,8 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
-        self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
         # Update the combobox options and entry fields
         self.update_support_dropdown()
 
@@ -1608,6 +1693,7 @@ class TrussAnalysisApp(tk.Tk):
         self.update_system_information()
         # Update information window
         self.update_calculation_information()
+        self.toggle_grid()
 
     def save_to_file(self):
         data = {
@@ -1672,7 +1758,8 @@ class TrussAnalysisApp(tk.Tk):
             self.toggle_grid()
             self.draw_element()
             self.draw_support('black', None)
-            self.draw_load()
+            self.toggle_loads()
+            self.toggle_node_labels()
 
     def plot_system(self):
         # Clear existing canvas
@@ -1683,7 +1770,8 @@ class TrussAnalysisApp(tk.Tk):
         self.toggle_grid()
         self.draw_element()
         self.draw_support('black', None)
-        self.draw_load()
+        self.toggle_loads()
+        self.toggle_node_labels()
 
 
 # Run the application
