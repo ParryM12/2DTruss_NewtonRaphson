@@ -1,7 +1,27 @@
 import numpy as np
 from typing import Dict
 from scipy.sparse import csr_array
-from functions.NewtonRaphson import sigma
+
+
+# Define static function to calculate stresses
+def sigma(eps, lin_coeff, quad_coeff, e_mod, eps_f):
+    # Handle division by zero in eps / abs(eps)
+    sign_eps = np.sign(eps)
+    sign_eps[eps == 0] = 1  # convention for zero
+
+    # Conditions
+    condlist = [(np.abs(eps) <= eps_f) | (quad_coeff == 0), (np.abs(eps) > eps_f) & (quad_coeff > 0)]
+
+    # Choice list for corresponding conditions
+    choicelist = [
+        (lin_coeff * eps - sign_eps * quad_coeff * eps ** 2) * e_mod,
+        (lin_coeff * eps_f - sign_eps * quad_coeff * eps_f ** 2) * e_mod
+    ]
+
+    # Element-wise selection of output
+    sigma_vals = np.select(condlist, choicelist, default=0)  # default value if none of the conditions are met
+
+    return sigma_vals
 
 
 class Element:
@@ -223,7 +243,8 @@ class Calculation:
         ele_area = np.array(ele_area).reshape(-1, 1)
         ele_eps_f = np.array(ele_eps_f).reshape(-1, 1)
         # if self.calc_param['calc_method'] in 'NR' or 'modNR' and sum(ele_quad_coeff) != 0:
-        if 'NR' in self.calc_param['calc_method'] or 'modNR' in self.calc_param['calc_method'] and sum(ele_quad_coeff) != 0:
+        if 'NR' in self.calc_param['calc_method'] or 'modNR' in self.calc_param['calc_method'] and sum(
+                ele_quad_coeff) != 0:
             if self.calc_param['number_of_iterations'] < 1:
                 print('The number of iterations has to be ≥ 1. "number_of_iterations" is set to 1.')
                 self.calc_param['number_of_iterations'] = 1
@@ -277,7 +298,8 @@ class Calculation:
                     print(f'Maximum number of {iter_number} iterations reached without meeting the stop criterion'
                           f' Δf ≤ {stop_criterion} kN!')
                     self.iter_break_number = self.calc_param['number_of_iterations']
-        elif 'NR' in self.calc_param['calc_method'] or 'modNR' in self.calc_param['calc_method'] and sum(ele_quad_coeff) == 0:
+        elif 'NR' in self.calc_param['calc_method'] or 'modNR' in self.calc_param['calc_method'] and sum(
+                ele_quad_coeff) == 0:
             self.axial_forces_cor = self.axial_forces
             print(f'Attention: You selected a nonlinear Newton-Raphson calculation, '
                   f'but you set the nonlinear parameter β of all elements to 0! Calculating linear...')
