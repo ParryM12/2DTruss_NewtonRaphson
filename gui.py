@@ -1,3 +1,28 @@
+"""
+#######################################################################
+LICENSE INFORMATION
+This file is part of Truss FEM.
+
+Truss FEM is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Truss FEM is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with Truss FEM. If not, see <https://www.gnu.org/licenses/>.
+#######################################################################
+
+#######################################################################
+Description:
+Main file for starting GUI
+#######################################################################
+"""
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import numpy as np
@@ -6,7 +31,10 @@ import copy
 from calculation import Calculation
 import json
 import pyautogui
-from PIL import ImageTk
+from PIL import ImageTk, Image
+import base64
+from io import BytesIO
+import webbrowser
 
 #################################################
 # Other
@@ -21,6 +49,59 @@ CONTACT = 'info@pum-consulting.de'
 #################################################
 
 
+# Function to set icon to windows
+def set_icon(root):
+    """
+    Creates Icon from raw byte data to not need external files for creating .exe
+    :return:
+    """
+    icon_image = ImageTk.PhotoImage(data=GUI_Settings.return_icon_bytestring())
+    root.tk.call('wm', 'iconphoto', root._w, icon_image)
+
+
+def center_window(window, width, height):
+    # Get the screen dimension
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+
+    # Calculate the x and y coordinates
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+
+    window.geometry(f'{width}x{height}+{x}+{y}')
+
+
+# Splash screen duration and progress bar update interval in milliseconds
+SPLASH_TIME = 3000
+
+# Create splash window
+splash_root = tk.Tk()
+set_icon(splash_root)
+splash_root.title("Truss FEM - Nonlinear Truss Structure Analysis")
+splash_root.geometry("512x512")  # Set your desired size
+center_window(splash_root, 512, 512)
+# Convert base64 string to PIL Image
+image_data = base64.b64decode(GUI_Settings.return_splashimage_base64())
+logo_image = Image.open(BytesIO(image_data))
+logo_photo = ImageTk.PhotoImage(logo_image)
+
+# Create and pack a label with the logo image
+logo_label = tk.Label(splash_root, image=logo_photo)
+logo_label.pack()
+
+
+# Function to close the splash screen and open the main window
+def end_splash():
+    splash_root.destroy()
+
+
+# Timer to close the splash screen
+splash_root.after(SPLASH_TIME, end_splash)
+
+# Run the splash screen
+splash_root.mainloop()
+
+
 # Main application class
 class TrussAnalysisApp(tk.Tk):
     """
@@ -32,7 +113,7 @@ class TrussAnalysisApp(tk.Tk):
         Constructor, inherits from tkinter
         """
         super().__init__()
-        self.set_icon(self)
+        set_icon(self)
         self.solution = None
         # Set title of main window
         self.title("Truss FEM - Nonlinear Truss Structure Analysis")
@@ -88,11 +169,10 @@ class TrussAnalysisApp(tk.Tk):
         self.input_calc_param = copy.deepcopy(self.input_calc_param_init)
 
     def init_ui(self):
-        print("Starting...Please wait.")  # Console output when running as .exe
-        print("DO NOT CLOSE THIS WINDOW (except to quit Truss FEM)")
         # Adjust the size
         self.geometry(f"{GUI_Settings.screensize[0]}x{GUI_Settings.screensize[1]}")
         self.resizable(False, False)
+        center_window(self, GUI_Settings.screensize[0], GUI_Settings.screensize[1])
 
         # Main frame for forms
         main_frame = ttk.Frame(self)
@@ -321,14 +401,6 @@ class TrussAnalysisApp(tk.Tk):
         self.canvas.create_text(start_x + 12, start_y + arrow_length - 8, text="y", anchor="center", width=1.5,
                                 font=GUI_Settings.ITALIC_FONT_1)
 
-    def set_icon(self, root):
-        """
-        Creates Icon from raw byte data to not need external files for creating .exe
-        :return:
-        """
-        icon_image = ImageTk.PhotoImage(data=GUI_Settings.return_icon_bytestring())
-        root.tk.call('wm', 'iconphoto', root._w, icon_image)
-
     def draw_grid(self):
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
@@ -395,26 +467,80 @@ class TrussAnalysisApp(tk.Tk):
         else:
             self.clear_grid()
 
+    # def display_info(self):
+    #     # Create a top-level window
+    #     info_window = tk.Toplevel(self)
+    #     set_icon(info_window)
+    #     info_window.geometry('600x300')
+    #     info_window.resizable(False, False)
+    #     center_window(info_window, 600, 300)
+    #     info_window.title("Information")
+    #
+    #     # Display the information
+    #     info_text = ("Truss FEM is a non commercial FEM software to calculate the axial forces and displacements of "
+    #                  "linear and nonlinear truss structures. Truss FEM is distributed in the hope that it will be "
+    #                  "useful, but without and warranty; without even the implied warranty of merchantability or "
+    #                  "fitness for a particular purpose.\n"
+    #                  "If you find any errors or have suggestions for improvement, please feel free to contact us.\n")
+    #     info_text += f"\nAuthors: {AUTHOR}\n"
+    #     info_text += f"Contact: {CONTACT}\n"
+    #     info_text += f"Version: {VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_PATCH}"
+    #     info_text += f"\nRelease: {RELEASE_DATE}\n"
+    #     info_text += f"Licence: GNU General Public License\n"
+    #     tk.Label(info_window, text=info_text, justify=tk.LEFT, wraplength=580).pack(padx=10, pady=10)
     def display_info(self):
         # Create a top-level window
         info_window = tk.Toplevel(self)
-        self.set_icon(info_window)
+        set_icon(info_window)
+        info_window.geometry('600x300')
+        info_window.resizable(False, False)
+        center_window(info_window, 600, 300)
         info_window.title("Information")
 
-        # Display the information
-        info_text = ("Truss FEM is a non commercial FEM software to calculate the axial forces and displacements of \n"
-                     "linear and nonlinear truss structures. We assume no liability for errors of any kind.\n"
-                     "If you find any errors or have suggestions for improvement, please feel free to contact us.\n")
+        # Create a Text widget
+        info_text_widget = tk.Text(info_window, wrap='word', height=15, width=70)
+        info_text_widget.pack(padx=10, pady=10)
+
+        # Insert the information text
+        info_text = ("Truss FEM is a non commercial FEM software to calculate the axial forces and displacements of "
+                     "linear and nonlinear truss structures. Truss FEM is distributed in the hope that it will be "
+                     "useful, but without and warranty; without even the implied warranty of merchantability or "
+                     "fitness for a particular purpose.\n"
+                     "If you find any errors or have suggestions for improvement, please feel free to contact us.\n\n")
         info_text += f"\nAuthors: {AUTHOR}\n"
         info_text += f"Contact: {CONTACT}\n"
         info_text += f"Version: {VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_PATCH}"
         info_text += f"\nRelease: {RELEASE_DATE}\n"
-        tk.Label(info_window, text=info_text, justify=tk.LEFT).pack(padx=10, pady=10)
+        info_text += f"Licence: \n"
+        info_text_widget.insert('1.0', info_text)
+
+        # Add hyperlink
+        hyperlink_text = "GNU General Public License"
+        info_text_widget.insert('end', hyperlink_text)
+        info_text_widget.tag_add("hyperlink", "end-1c linestart", "end-1c lineend")
+        info_text_widget.tag_config("hyperlink", foreground="blue", underline=True)
+
+        # Function to open a hyperlink
+        def open_hyperlink(url):
+            try:
+                webbrowser.open_new(url)
+            except ValueError as e:
+                # Show a warning message box
+                messagebox.showwarning("Warning", "Could not open webbrowser! Maybe open the link "
+                                                  "https://www.gnu.org/licenses/ manually.")
+
+        info_text_widget.tag_bind("hyperlink", "<Button-1>", lambda e: open_hyperlink("https://www.gnu.org/licenses/"))
+
+        # Make the text widget read-only
+        info_text_widget.config(state='disabled')
 
     def display_tutorial(self):
         # Create a top-level window
         info_window = tk.Toplevel(self)
-        self.set_icon(info_window)
+        set_icon(info_window)
+        info_window.geometry('400x200')
+        info_window.resizable(False, False)
+        center_window(info_window, 400, 200)
         info_window.title("Tutorial")
 
         # Display the information
@@ -1117,7 +1243,7 @@ class TrussAnalysisApp(tk.Tk):
 
     def edit_element(self):
         self.edit_window = tk.Toplevel(self)
-        self.set_icon(self.edit_window)
+        set_icon(self.edit_window)
         self.edit_window.title("Edit Element")
 
         # Frame for entry boxes and labels
@@ -1320,7 +1446,7 @@ class TrussAnalysisApp(tk.Tk):
 
     def edit_load(self):
         self.edit_window_load = tk.Toplevel(self)
-        self.set_icon(self.edit_window_load)
+        set_icon(self.edit_window_load)
         self.edit_window_load.title("Edit Load")
 
         # Frame for entry boxes and labels
@@ -1486,7 +1612,7 @@ class TrussAnalysisApp(tk.Tk):
 
     def edit_support(self):
         self.edit_window_support = tk.Toplevel(self)
-        self.set_icon(self.edit_window_support)
+        set_icon(self.edit_window_support)
         self.edit_window_support.title("Edit Support")
 
         # Frame for entry boxes and labels
