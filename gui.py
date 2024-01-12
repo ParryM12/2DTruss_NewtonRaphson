@@ -502,7 +502,7 @@ class TrussAnalysisApp(tk.Tk):
         info_text_widget.pack(padx=10, pady=10)
 
         # Insert the information text
-        info_text = ("Truss FEM is a non commercial FEM software to calculate the axial forces and displacements of "
+        info_text = ("Truss FEM is a non-commercial FEM software to calculate the axial forces and displacements of "
                      "linear and nonlinear truss structures. Truss FEM is distributed in the hope that it will be "
                      "useful, but without and warranty; without even the implied warranty of merchantability or "
                      "fitness for a particular purpose.\n"
@@ -1384,7 +1384,7 @@ class TrussAnalysisApp(tk.Tk):
         new_input_elements = {}
         for i, key in enumerate(sorted(self.input_elements.keys())):
             new_input_elements[str(i)] = self.input_elements[key]
-
+            new_input_elements[str(i)]['ele_number'] = i
         self.input_elements = new_input_elements
         # Update information window
         self.update_system_information()
@@ -1551,6 +1551,7 @@ class TrussAnalysisApp(tk.Tk):
         new_input_loads = {}
         for i, key in enumerate(sorted(self.input_forces.keys())):
             new_input_loads[str(i)] = self.input_forces[key]
+            new_input_loads[str(i)]['force_number'] = i
 
         self.input_forces = new_input_loads
         # Update information window
@@ -1720,6 +1721,7 @@ class TrussAnalysisApp(tk.Tk):
         new_input_supports = {}
         for i, key in enumerate(sorted(self.input_supports.keys())):
             new_input_supports[str(i)] = self.input_supports[key]
+            new_input_supports[str(i)]['sup_number'] = i
 
         self.input_supports = new_input_supports
         # Update information window
@@ -1772,6 +1774,18 @@ class TrussAnalysisApp(tk.Tk):
             return None
 
     def run_calculation(self):
+        # Check Input parameters for errors:
+        ele_quad_coeff = []
+        for ele_id, ele_values in self.input_elements.items():
+            ele_quad_coeff.append(abs(ele_values['ele_quad_coeff']))
+        if 'NR' in self.input_calc_param['calc_method'] or 'modNR' in self.input_calc_param['calc_method'] and sum(
+                ele_quad_coeff) == 0:
+            messagebox.showwarning("Warning", f"You selected a nonlinear Newton-Raphson calculation, "
+                                              f"but you set the nonlinear parameter β of all elements to 0! "
+                                              f"Calculating linear...")
+            self.input_calc_param['calc_method'] = 'linear'
+            self.method_combobox.current(0)
+        # Run Calculation
         calculation = Calculation(self.input_elements, self.input_supports, self.input_forces, self.input_calc_param)
         self.solution = calculation.return_solution()
         if self.solution is not None and self.solution['error_linalg'] is None:
@@ -1819,6 +1833,9 @@ class TrussAnalysisApp(tk.Tk):
         self.add_support_initialise = 0
         self.add_load_initialise = 0
         self.add_calc_initialise = 0
+        self.ele_number = 0
+        self.force_number = 0
+        self.support_number = 0
         self.max_force = 1
         self.solution = None
         self.plot_linear_deformation.config(state='disabled')
@@ -1863,7 +1880,9 @@ class TrussAnalysisApp(tk.Tk):
             # Convert lists back to tuples for nodes
             if 'input_elements' in data:
                 self.add_element_initialise = 1
+                self.ele_number = 0
                 for key, element in data['input_elements'].items():
+                    self.ele_number += 1
                     if 'ele_node_i' in element:
                         element['ele_node_i'] = tuple(element['ele_node_i'])
                     if 'ele_node_j' in element:
@@ -1871,13 +1890,17 @@ class TrussAnalysisApp(tk.Tk):
 
             if 'input_supports' in data:
                 self.add_support_initialise = 1
+                self.support_number = 0
                 for key, support in data['input_supports'].items():
+                    self.support_number += 1
                     if 'sup_node' in support:
                         support['sup_node'] = tuple(support['sup_node'])
 
             if 'input_forces' in data:
                 self.add_load_initialise = 1
+                self.force_number = 0
                 for key, force in data['input_forces'].items():
+                    self.force_number += 1
                     if 'force_node' in force:
                         force['force_node'] = tuple(force['force_node'])
             if 'input_calc_param' in data:
