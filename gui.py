@@ -964,7 +964,7 @@ class TrussAnalysisApp(tk.Tk):
             'axial_forces_linear' if calculation_type == 'linear' else 'axial_forces_nonlinear', [])
 
         # Check if solution is available
-        if axial_forces is None or all(axial_forces) == 0:
+        if axial_forces is None or all(x == 0 for x in axial_forces):
             messagebox.showwarning("Warning", "No axial forces data available.")
             return
 
@@ -1436,6 +1436,7 @@ class TrussAnalysisApp(tk.Tk):
             self.update_system_information()
             # Draw elements, supports and loads on canvas
             self.canvas.delete("all")  # Clear the canvas
+            self.toggle_grid()
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support('black', None)
@@ -1518,6 +1519,7 @@ class TrussAnalysisApp(tk.Tk):
         self.update_system_information()
         # Draw elements, supports and loads on canvas
         self.canvas.delete("all")  # Clear the canvas
+        self.toggle_grid()
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
@@ -1555,6 +1557,7 @@ class TrussAnalysisApp(tk.Tk):
         self.update_system_information()
         # Draw elements, supports and loads on canvas
         self.canvas.delete("all")  # Clear the canvas
+        self.toggle_grid()
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
@@ -1601,6 +1604,7 @@ class TrussAnalysisApp(tk.Tk):
             self.update_system_information()
             # Draw elements, supports and loads on canvas
             self.canvas.delete("all")  # Clear the canvas
+            self.toggle_grid()
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support('black', None)
@@ -1684,6 +1688,7 @@ class TrussAnalysisApp(tk.Tk):
         self.update_system_information()
         # Draw elements, supports and loads on canvas
         self.canvas.delete("all")  # Clear the canvas
+        self.toggle_grid()
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
@@ -1721,6 +1726,7 @@ class TrussAnalysisApp(tk.Tk):
         self.update_system_information()
         # Draw elements, supports and loads on canvas
         self.canvas.delete("all")  # Clear the canvas
+        self.toggle_grid()
         self.draw_coordinate_system()
         self.draw_element()
         self.draw_support('black', None)
@@ -1815,6 +1821,19 @@ class TrussAnalysisApp(tk.Tk):
         self.add_calc_initialise = 0
         self.max_force = 1
         self.solution = None
+        self.plot_linear_deformation.config(state='disabled')
+        self.plot_linear_forces.config(state='disabled')
+        self.export_plot.config(state='disabled')
+        self.plot_nonlinear_deformation.config(state='disabled')
+        self.plot_nonlinear_forces.config(state='disabled')
+        self.num_iterations_entry.delete(0, tk.END)
+        self.delta_f_entry.delete(0, tk.END)
+        self.method_combobox.current(0)
+        self.show_grid_state.set(True)
+        self.show_loads_state.set(True)
+        self.show_header_state.set(False)
+        self.show_node_labels_state.set(False)
+        self.show_element_labels_state.set(False)
         # Update information window
         self.update_system_information()
         # Update information window
