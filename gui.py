@@ -1778,7 +1778,7 @@ class TrussAnalysisApp(tk.Tk):
         ele_quad_coeff = []
         for ele_id, ele_values in self.input_elements.items():
             ele_quad_coeff.append(abs(ele_values['ele_quad_coeff']))
-        if 'NR' in self.input_calc_param['calc_method'] or 'modNR' in self.input_calc_param['calc_method'] and sum(
+        if (self.input_calc_param['calc_method'] in 'NR' or self.input_calc_param['calc_method'] in 'modNR') and sum(
                 ele_quad_coeff) == 0:
             messagebox.showwarning("Warning", f"You selected a nonlinear Newton-Raphson calculation, "
                                               f"but you set the nonlinear parameter β of all elements to 0! "
