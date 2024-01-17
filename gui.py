@@ -511,14 +511,21 @@ class TrussAnalysisApp(tk.Tk):
         info_text += f"Contact: {CONTACT}\n"
         info_text += f"Version: {VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_PATCH}"
         info_text += f"\nRelease: {RELEASE_DATE}\n"
-        info_text += f"Licence: \n"
+        info_text += f"License: "
         info_text_widget.insert('1.0', info_text)
 
-        # Add hyperlink
+        # Add hyperlink text
         hyperlink_text = "GNU General Public License"
-        info_text_widget.insert('end', hyperlink_text)
-        info_text_widget.tag_add("hyperlink", "end-1c linestart", "end-1c lineend")
+        info_text_widget.insert('end', hyperlink_text)  # Insert hyperlink text at the end
+        start = "end-{}c".format(len(hyperlink_text) + 1)  # Calculate the start position of the hyperlink text
+        info_text_widget.tag_add("hyperlink", start, "end")  # Apply the tag only to the hyperlink text
         info_text_widget.tag_config("hyperlink", foreground="blue", underline=True)
+
+        # # Add hyperlink
+        # hyperlink_text = "GNU General Public License"
+        # info_text_widget.insert('end', hyperlink_text)
+        # info_text_widget.tag_add("hyperlink", "end-1c linestart", "end-1c lineend")
+        # info_text_widget.tag_config("hyperlink", foreground="blue", underline=True)
 
         # Function to open a hyperlink
         def open_hyperlink(url):
