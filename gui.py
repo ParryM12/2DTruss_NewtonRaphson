@@ -159,6 +159,7 @@ class TrussAnalysisApp(tk.Tk):
         self.add_load_initialise = 0
         self.add_calc_initialise = 0
         self.max_force = 1
+        self.max_reaction_force = 1
         self.linear_displacement = None
         self.nonlinear_displacement = None
         self.nodes = []
@@ -467,27 +468,6 @@ class TrussAnalysisApp(tk.Tk):
         else:
             self.clear_grid()
 
-    # def display_info(self):
-    #     # Create a top-level window
-    #     info_window = tk.Toplevel(self)
-    #     set_icon(info_window)
-    #     info_window.geometry('600x300')
-    #     info_window.resizable(False, False)
-    #     center_window(info_window, 600, 300)
-    #     info_window.title("Information")
-    #
-    #     # Display the information
-    #     info_text = ("Truss FEM is a non commercial FEM software to calculate the axial forces and displacements of "
-    #                  "linear and nonlinear truss structures. Truss FEM is distributed in the hope that it will be "
-    #                  "useful, but without and warranty; without even the implied warranty of merchantability or "
-    #                  "fitness for a particular purpose.\n"
-    #                  "If you find any errors or have suggestions for improvement, please feel free to contact us.\n")
-    #     info_text += f"\nAuthors: {AUTHOR}\n"
-    #     info_text += f"Contact: {CONTACT}\n"
-    #     info_text += f"Version: {VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_PATCH}"
-    #     info_text += f"\nRelease: {RELEASE_DATE}\n"
-    #     info_text += f"Licence: GNU General Public License\n"
-    #     tk.Label(info_window, text=info_text, justify=tk.LEFT, wraplength=580).pack(padx=10, pady=10)
     def display_info(self):
         # Create a top-level window
         info_window = tk.Toplevel(self)
@@ -791,10 +771,9 @@ class TrussAnalysisApp(tk.Tk):
                                     width=2.5)
 
     def draw_load(self):
-        # scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
-        arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed.
         # Draw Loads
         dxy = 13
+        arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed.
         for load in self.input_forces.values():
             node = self.scale_and_translate(*load['force_node'])
             f_x, f_y = load['f_x'], load['f_y']
@@ -809,8 +788,6 @@ class TrussAnalysisApp(tk.Tk):
                     self.canvas.create_line(node[0] + scale_fx, node[1], node[0] + dxy, node[1], arrow=tk.LAST,
                                             width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 f_x_label = f"H = {abs(f_x)} kN"
-                # label_offset_x = 0.08 * scale
-                # label_offset_y = -0.1 * scale
                 label_offset_x = 11.7
                 label_offset_y = -14.6
                 self.canvas.create_text(node[0] + scale_fx + label_offset_x, node[1] + label_offset_y,
@@ -824,12 +801,49 @@ class TrussAnalysisApp(tk.Tk):
                     self.canvas.create_line(node[0], node[1] - dxy, node[0], node[1] - scale_fy, arrow=tk.LAST,
                                             width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 f_y_label = f"F = {abs(f_y)} kN"
-                # label_offset_x = 0.05 * scale
-                # label_offset_y = -0.09 * scale
                 label_offset_x = 7.3
                 label_offset_y = -13.1
                 self.canvas.create_text(node[0] + label_offset_x, node[1] - scale_fy + label_offset_y,
                                         text=f_y_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1,
+                                        tags='load_label')
+
+    def draw_reaction_forces(self, reactions):
+        # Reshape input
+        reactions = reactions.reshape(-1, 2)
+        # Draw Loads
+        dxy = 13
+        arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed
+        for index, reaction in enumerate(reactions):
+            node = self.nodes[index]
+            f_x, f_y = reaction[0], reaction[1]
+            self.max_reaction_force = max(self.max_reaction_force, abs(f_x), abs(f_y))
+            scale_fx = abs(f_x / self.max_force) * 90
+            scale_fy = abs(f_y / self.max_force) * 90
+            if f_x != 0:
+                if f_x > 0:
+                    self.canvas.create_line(node[0] + dxy, node[1], node[0] + scale_fx, node[1], arrow=tk.LAST,
+                                            width=2.5, fill="red", arrowshape=arrow_shape, tags='load_arrow')
+                else:
+                    self.canvas.create_line(node[0] + scale_fx, node[1], node[0] + dxy, node[1], arrow=tk.LAST,
+                                            width=2.5, fill="red", arrowshape=arrow_shape, tags='load_arrow')
+                f_x_label = f"R_x = {abs(f_x)} kN"
+                label_offset_x = 11.7
+                label_offset_y = -14.6
+                self.canvas.create_text(node[0] + scale_fx + label_offset_x, node[1] + label_offset_y,
+                                        text=f_x_label, fill="red", font=GUI_Settings.STANDARD_FONT_1,
+                                        tags='load_label')
+            if f_y != 0:
+                if f_y > 0:
+                    self.canvas.create_line(node[0], node[1] - scale_fy, node[0], node[1] - dxy, arrow=tk.LAST,
+                                            width=2.5, fill="red", arrowshape=arrow_shape, tags='load_arrow')
+                else:
+                    self.canvas.create_line(node[0], node[1] - dxy, node[0], node[1] - scale_fy, arrow=tk.LAST,
+                                            width=2.5, fill="red", arrowshape=arrow_shape, tags='load_arrow')
+                f_y_label = f"R_y = {abs(f_y)} kN"
+                label_offset_x = 7.3
+                label_offset_y = -13.1
+                self.canvas.create_text(node[0] + label_offset_x, node[1] - scale_fy + label_offset_y,
+                                        text=f_y_label, fill="red", font=GUI_Settings.STANDARD_FONT_1,
                                         tags='load_label')
 
     def clear_load(self):
@@ -1808,6 +1822,8 @@ class TrussAnalysisApp(tk.Tk):
                 self.linear_displacement = self.solution['node_displacements_linear']
                 print('The axial forces of the linear elastic calculation are:')
                 print(self.solution['axial_forces_linear'])
+                print('The global forces equilibrium (linear support reaction forces) are:')
+                print(self.solution['node_equilibrium_linear'])
             else:
                 # Disable the button if linear results are not available
                 self.plot_linear_deformation.config(state='disabled')
@@ -1818,6 +1834,8 @@ class TrussAnalysisApp(tk.Tk):
                 self.nonlinear_displacement = self.solution['node_displacements_nonlinear']
                 print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')
                 print(self.solution['axial_forces_nonlinear'])
+                print('The global forces equilibrium (nonlinear support reaction forces) are:')
+                print(self.solution['node_equilibrium_nonlinear'])
 
             self.update_calculation_information()
 

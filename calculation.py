@@ -26,6 +26,7 @@ Main file for calculation
 import numpy as np
 from typing import Dict
 from scipy.sparse import csr_array
+import copy
 
 
 # Define static function to calculate stresses
@@ -120,6 +121,8 @@ class Calculation:
         self.displacements_cor_total = None
         self.axial_forces_cor = None
         self.f_vec_mismatch = None
+        self.node_equilibrium_linear = None
+        self.node_equilibrium_nonlinear = None
         self.iter_break_number = 0
         self.e_linalg = None
 
@@ -241,6 +244,8 @@ class Calculation:
                 break
             self.f_vec[index_nodes * 2] += force_values['f_x']
             self.f_vec[index_nodes * 2 + 1] += force_values['f_y']
+        # Set force vector entries to 0 at the positions of supports
+        self.f_vec[np.diag(self.k_sys) == 1] = 0
 
         # Solve system of equations for global node displacements
         try:
@@ -251,13 +256,18 @@ class Calculation:
             return
         # Calculate axial forces and strain
         strain = []
+        internal_f_vec_glob = np.zeros(self.f_vec.shape)
         for i in range(len(self.element_matrices)):
             self.displacements_local.append(np.transpose(self.element_matrices[i]['transformation_matrix'])
                                             @ self.displacements[self.element_matrices[i]['DOFs']])
             axial_force_i = self.element_matrices[i]['K_local'] @ self.displacements_local[i]
+            axial_force_global_i = self.element_matrices[i]['transformation_matrix'] @ axial_force_i
             self.axial_forces = np.append(self.axial_forces, axial_force_i[2])
             strain.append((self.displacements_local[i][2] - self.displacements_local[i][0])
                           / self.element_matrices[i]['length'])
+            internal_f_vec_glob[self.element_matrices[i]['DOFs']] += axial_force_global_i
+        # Calculate global forces equilibrium to get support reactions
+        self.node_equilibrium_linear = self.f_vec - internal_f_vec_glob
 
         # Newton-Raphson-Method for nonlinear stress-strain relationship
         displacements_cor = np.zeros((self.k_sys.shape[0], 1))
@@ -285,6 +295,7 @@ class Calculation:
                                                  4, 1))
                     f_vec_cor[self.element_matrices[i]['DOFs']] += axial_forces_cor_glob
                 self.f_vec_mismatch = self.f_vec - f_vec_cor
+                node_equilibrium = copy.copy(self.f_vec_mismatch)
                 # Calculate additional displacements
                 if self.calc_param['calc_method'] in 'NR':
                     for i in range(len(self.element_matrices)):
@@ -303,6 +314,7 @@ class Calculation:
                 if max(abs(self.f_vec_mismatch)) <= stop_criterion:
                     print(f'Stop criterion of Δf ≤ {stop_criterion} kN reached at iteration step {iter_number}!')
                     self.iter_break_number = iter_number
+                    self.node_equilibrium_nonlinear = node_equilibrium
                     break
 
                 # Calculate total displacement
@@ -342,6 +354,8 @@ class Calculation:
                          'node_displacements_nonlinear': self.displacements_cor_total,
                          'axial_forces_linear': self.axial_forces,
                          'axial_forces_nonlinear': self.axial_forces_cor,
+                         'node_equilibrium_linear': np.round(self.node_equilibrium_linear, 2),
+                         'node_equilibrium_nonlinear': np.round(self.node_equilibrium_nonlinear, 2),
                          'node_forces_mismatch': self.f_vec_mismatch,
                          'iteration_break_number': self.iter_break_number,
                          'error_linalg': self.e_linalg}
