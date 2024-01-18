@@ -125,6 +125,7 @@ class Calculation:
         self.node_equilibrium_nonlinear = None
         self.iter_break_number = 0
         self.e_linalg = None
+        self.spring_index = []
 
     def return_solution(self):
         """
@@ -167,7 +168,7 @@ class Calculation:
         # Create sparse matrix for K
         k_sys = csr_array((k_g, (np.array(i_g), np.array(j_g))), shape=(num_dofs + 1, num_dofs + 1), dtype=np.float64)
         k_sys = k_sys.toarray()
-
+        self.spring_index = np.zeros(k_sys.shape[0]).reshape(-1,1)
         # Assemble boundary conditions (supports/springs), if spring stiffness = 1 a rigid bc is applied
         for support_id, support_values in self.supports.items():
             try:
@@ -176,14 +177,16 @@ class Calculation:
                 print(f"The support {support_id} with the coordinates {support_values['sup_node']} is not connected "
                       f"to a truss element!")
                 break
-            if support_values['c_x'] != 1:
+            if support_values['c_x'] > 1:
                 k_sys[index_nodes * 2, index_nodes * 2] += support_values['c_x']
+                self.spring_index[index_nodes * 2] = support_values['c_x']
             elif support_values['c_x'] == 1:
                 k_sys[index_nodes * 2, :] = 0
                 k_sys[:, index_nodes * 2] = 0
                 k_sys[index_nodes * 2, index_nodes * 2] = 1
-            if support_values['c_y'] != 1:
+            if support_values['c_y'] > 1:
                 k_sys[index_nodes * 2 + 1, index_nodes * 2 + 1] += support_values['c_y']
+                self.spring_index[index_nodes * 2 + 1] = support_values['c_y']
             elif support_values['c_y'] == 1:
                 k_sys[index_nodes * 2 + 1, :] = 0
                 k_sys[:, index_nodes * 2 + 1] = 0
@@ -278,8 +281,9 @@ class Calculation:
         ele_area = np.array(ele_area).reshape(-1, 1)
         ele_eps_f = np.array(ele_eps_f).reshape(-1, 1)
         # if self.calc_param['calc_method'] in 'NR' or 'modNR' and sum(ele_quad_coeff) != 0:
-        if 'NR' in self.calc_param['calc_method'] or 'modNR' in self.calc_param['calc_method'] and sum(
+        if (self.calc_param['calc_method'] in 'NR' or self.calc_param['calc_method'] in 'modNR') and sum(
                 ele_quad_coeff) != 0:
+            self.displacements_cor_total = self.displacements
             if self.calc_param['number_of_iterations'] < 1:
                 print('The number of iterations has to be ≥ 1. "number_of_iterations" is set to 1.')
                 self.calc_param['number_of_iterations'] = 1
@@ -294,8 +298,10 @@ class Calculation:
                                              np.array([-axial_forces_cor[i][0], 0, axial_forces_cor[i][0], 0]).reshape(
                                                  4, 1))
                     f_vec_cor[self.element_matrices[i]['DOFs']] += axial_forces_cor_glob
+                spring_reactions_forces = self.spring_index * self.displacements_cor_total
                 self.f_vec_mismatch = self.f_vec - f_vec_cor
                 node_equilibrium = copy.copy(self.f_vec_mismatch)
+                self.f_vec_mismatch += - spring_reactions_forces
                 # Calculate additional displacements
                 if self.calc_param['calc_method'] in 'NR':
                     for i in range(len(self.element_matrices)):
@@ -328,9 +334,6 @@ class Calculation:
                                  / self.element_matrices[i]['length'])
                 self.axial_forces_cor = np.array(sigma(strain, ele_lin_coeff, ele_quad_coeff, ele_e, ele_eps_f)
                                                  * ele_area)
-                # Flatten the list of lists into a single list and change shape of cor_displacements
-                self.axial_forces_cor = [force[0] for force in self.axial_forces_cor if force]
-                self.displacements_cor_total = self.displacements_cor_total.reshape(-1, 2)
                 if iter_number == self.calc_param['number_of_iterations']:
                     print(f'Maximum number of {iter_number} iterations reached without meeting the stop criterion'
                           f' Δf ≤ {stop_criterion} kN!')
@@ -343,19 +346,26 @@ class Calculation:
         elif 'linear' in self.calc_param['calc_method'] and sum(ele_quad_coeff) != 0:
             print(f'Attention: You selected a linear calculation, '
                   f'but you set the nonlinear parameter β of at least one element not to 0! Calculating linear...')
+        # Flatten the list of lists into a single list and change shape of cor_displacements
+        self.axial_forces_cor = [force[0] for force in self.axial_forces_cor if force]
+        self.displacements_cor_total = self.displacements_cor_total.reshape(-1, 2)
         # Round output
         self.axial_forces = np.round(self.axial_forces, 2)
         if self.f_vec_mismatch is not None:
             self.f_vec_mismatch = np.round(self.f_vec_mismatch, 2)
         if self.axial_forces_cor is not None:
             self.axial_forces_cor = np.round(self.axial_forces_cor, 2)
+        if self.node_equilibrium_linear is not None:
+            self.node_equilibrium_linear = np.round(self.node_equilibrium_linear, 2)
+        if self.node_equilibrium_nonlinear is not None:
+            self.node_equilibrium_nonlinear = np.round(self.node_equilibrium_nonlinear, 2)
         # Return solution
         self.solution = {'nodes': self.nodes, 'node_displacements_linear': self.displacements.reshape(-1, 2),
                          'node_displacements_nonlinear': self.displacements_cor_total,
                          'axial_forces_linear': self.axial_forces,
                          'axial_forces_nonlinear': self.axial_forces_cor,
-                         'node_equilibrium_linear': np.round(self.node_equilibrium_linear, 2),
-                         'node_equilibrium_nonlinear': np.round(self.node_equilibrium_nonlinear, 2),
+                         'node_equilibrium_linear': self.node_equilibrium_linear,
+                         'node_equilibrium_nonlinear': self.node_equilibrium_nonlinear,
                          'node_forces_mismatch': self.f_vec_mismatch,
                          'iteration_break_number': self.iter_break_number,
                          'error_linalg': self.e_linalg}

@@ -200,11 +200,11 @@ class TrussAnalysisApp(tk.Tk):
         save_frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2 * 0.33)
         save_frame.columnconfigure(2, minsize=GUI_Settings.FRAME_WIDTH_COL2 * 0.33)
         # Create Button
-        ttk.Button(save_frame, text="Save Data", command=self.save_to_file).grid(row=0, column=0, padx=10, pady=0,
+        ttk.Button(save_frame, text="Save Data", command=self.save_to_file).grid(row=0, column=0, padx=15, pady=0,
                                                                                  sticky='w')
-        ttk.Button(save_frame, text="Load Data", command=self.load_from_file).grid(row=0, column=1, padx=10, pady=0,
+        ttk.Button(save_frame, text="Load Data", command=self.load_from_file).grid(row=0, column=1, padx=15, pady=0,
                                                                                    sticky='w')
-        ttk.Button(save_frame, text="Clear all", command=self.clear_all).grid(row=0, column=2, padx=10, pady=0,
+        ttk.Button(save_frame, text="Clear all", command=self.clear_all).grid(row=0, column=2, padx=15, pady=0,
                                                                               sticky='w')
         #############
 
@@ -501,12 +501,6 @@ class TrussAnalysisApp(tk.Tk):
         info_text_widget.tag_add("hyperlink", start, "end")  # Apply the tag only to the hyperlink text
         info_text_widget.tag_config("hyperlink", foreground="blue", underline=True)
 
-        # # Add hyperlink
-        # hyperlink_text = "GNU General Public License"
-        # info_text_widget.insert('end', hyperlink_text)
-        # info_text_widget.tag_add("hyperlink", "end-1c linestart", "end-1c lineend")
-        # info_text_widget.tag_config("hyperlink", foreground="blue", underline=True)
-
         # Function to open a hyperlink
         def open_hyperlink(url):
             try:
@@ -565,8 +559,16 @@ class TrussAnalysisApp(tk.Tk):
         if self.input_supports and self.add_support_initialise == 1:
             info_text += "\nSupports:\n"
             for sup in self.input_supports.values():
-                info_text += (f"Support {sup['sup_number']}: Node = {sup['sup_node']}, c_x = {sup['c_x']} kN/m, "
-                              f"c_y = {sup['c_y']} kN/m.\n")
+                if sup['c_x'] != 1:
+                    c_x = sup['c_x']
+                else:
+                    c_x = '∞'
+                if sup['c_y'] != 1:
+                    c_y = sup['c_y']
+                else:
+                    c_y = '∞'
+                info_text += (f"Support {sup['sup_number']}: Node = {sup['sup_node']}, c_x = {c_x} kN/m, "
+                              f"c_y = {c_y} kN/m.\n")
 
         # Adding information about loads
         if self.input_forces and self.add_load_initialise == 1:
@@ -737,6 +739,9 @@ class TrussAnalysisApp(tk.Tk):
             hinge_radius = 7
             x, y = node
             dxy = 29  # Defines the size of the plotted support
+            s_dx = 20
+            s_dy = 15
+            s_hline_dxy = 10
             dxy_hline = 36  # Defines the size of the horizontal line of
             # Support fixed in x- and y- direction:
             if support['c_x'] == 1 and support['c_y'] == 1:
@@ -746,7 +751,7 @@ class TrussAnalysisApp(tk.Tk):
                     end = points[i + 1]
                     self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
             # Support fixed only in x-direction:
-            if support['c_x'] == 1 and support['c_y'] == 0:
+            if support['c_x'] == 1 and support['c_y'] != 1:
                 points = [(x, y), (x + dxy, y - dxy), (x + dxy, y + dxy), (x, y)]
                 points_hline = [(x + dxy_hline, y - dxy_hline), (x + dxy_hline, y + dxy_hline)]
                 self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
@@ -756,9 +761,35 @@ class TrussAnalysisApp(tk.Tk):
                     end = points[i + 1]
                     self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
             # Support fixed only in y-direction:
-            if support['c_x'] == 0 and support['c_y'] == 1:
+            if support['c_x'] != 1 and support['c_y'] == 1:
                 points = [(x, y), (x - dxy, y + dxy), (x + dxy, y + dxy), (x, y)]
                 points_hline = [(x - dxy_hline, y + dxy_hline), (x + dxy_hline, y + dxy_hline)]
+                self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
+                                        fill=color, width=2.5)
+                for i in range(len(points) - 1):
+                    start = points[i]
+                    end = points[i + 1]
+                    self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
+            # Support elastic in y-direction and free in x-direction:
+            if support['c_y'] > 1:
+                points = [(x, y), (x + s_dx / 2, y + s_dy / 2), (x - s_dx / 2, y + s_dy),
+                          (x + s_dx / 2, y + 1.5 * s_dy),
+                          (x - s_dx / 2, y + 2 * s_dy), (x + s_dx / 2, y + 2.5 * s_dy), (x - s_dx / 2, y + 2.5 * s_dy)]
+                points_hline = [(x - s_dx / 2 - s_hline_dxy, y + 2.5 * s_dy + s_hline_dxy/2),
+                                (x + s_dx / 2 + s_hline_dxy, y + 2.5 * s_dy + s_hline_dxy/2)]
+                self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
+                                        fill=color, width=2.5)
+                for i in range(len(points) - 1):
+                    start = points[i]
+                    end = points[i + 1]
+                    self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
+            # Support elastic in x-direction and free in y-direction:
+            if support['c_x'] > 1:
+                points = [(x, y), (x + s_dy / 2, y + s_dx / 2), (x + s_dy, y - s_dx / 2),
+                          (x + 1.5 * s_dy, y + s_dx / 2),
+                          (x + 2 * s_dy, y - s_dx / 2), (x + 2.5 * s_dy, y + s_dx / 2), (x + 2.5 * s_dy, y - s_dx / 2)]
+                points_hline = [(x + 2.5 * s_dy + s_hline_dxy/2, y - s_dx / 2 - s_hline_dxy),
+                                (x + 2.5 * s_dy + s_hline_dxy/2, y + s_dx / 2 + s_hline_dxy)]
                 self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
                                         fill=color, width=2.5)
                 for i in range(len(points) - 1):
@@ -807,45 +838,6 @@ class TrussAnalysisApp(tk.Tk):
                                         text=f_y_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1,
                                         tags='load_label')
 
-    def draw_reaction_forces(self, reactions):
-        # Reshape input
-        reactions = reactions.reshape(-1, 2)
-        # Draw Loads
-        dxy = 13
-        arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed
-        for index, reaction in enumerate(reactions):
-            node = self.nodes[index]
-            f_x, f_y = reaction[0], reaction[1]
-            self.max_reaction_force = max(self.max_reaction_force, abs(f_x), abs(f_y))
-            scale_fx = abs(f_x / self.max_force) * 90
-            scale_fy = abs(f_y / self.max_force) * 90
-            if f_x != 0:
-                if f_x > 0:
-                    self.canvas.create_line(node[0] + dxy, node[1], node[0] + scale_fx, node[1], arrow=tk.LAST,
-                                            width=2.5, fill="red", arrowshape=arrow_shape, tags='load_arrow')
-                else:
-                    self.canvas.create_line(node[0] + scale_fx, node[1], node[0] + dxy, node[1], arrow=tk.LAST,
-                                            width=2.5, fill="red", arrowshape=arrow_shape, tags='load_arrow')
-                f_x_label = f"R_x = {abs(f_x)} kN"
-                label_offset_x = 11.7
-                label_offset_y = -14.6
-                self.canvas.create_text(node[0] + scale_fx + label_offset_x, node[1] + label_offset_y,
-                                        text=f_x_label, fill="red", font=GUI_Settings.STANDARD_FONT_1,
-                                        tags='load_label')
-            if f_y != 0:
-                if f_y > 0:
-                    self.canvas.create_line(node[0], node[1] - scale_fy, node[0], node[1] - dxy, arrow=tk.LAST,
-                                            width=2.5, fill="red", arrowshape=arrow_shape, tags='load_arrow')
-                else:
-                    self.canvas.create_line(node[0], node[1] - dxy, node[0], node[1] - scale_fy, arrow=tk.LAST,
-                                            width=2.5, fill="red", arrowshape=arrow_shape, tags='load_arrow')
-                f_y_label = f"R_y = {abs(f_y)} kN"
-                label_offset_x = 7.3
-                label_offset_y = -13.1
-                self.canvas.create_text(node[0] + label_offset_x, node[1] - scale_fy + label_offset_y,
-                                        text=f_y_label, fill="red", font=GUI_Settings.STANDARD_FONT_1,
-                                        tags='load_label')
-
     def clear_load(self):
         # Remove all loads and labels
         self.canvas.delete("load_arrow")
@@ -856,6 +848,51 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_load()
         else:
             self.clear_load()
+
+    def draw_reaction_forces(self, reactions):
+        if reactions is not None:
+            # Reshape input
+            reactions = reactions.reshape(-1, 2)
+            self.nodes = self.solution['nodes']
+            self.max_reaction_force = np.max(abs(reactions))
+            # Draw Loads
+            dxy = 40
+            arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed
+            for index, reaction in enumerate(reactions):
+                node = self.scale_and_translate(*self.nodes[index])
+                f_x, f_y = reaction[0], reaction[1]
+                scale_fx = np.max((abs(f_x / self.max_reaction_force) * 80, 20))
+                scale_fy = np.max((abs(f_y / self.max_reaction_force) * 80, 20))
+                if abs(f_x) > np.max((1, self.input_calc_param_init['delta_f_max'])):
+                    if f_x > 0:
+                        self.canvas.create_line(node[0] - dxy, node[1], node[0] - scale_fx - dxy, node[1],
+                                                arrow=tk.LAST,
+                                                width=2.5, fill="purple", arrowshape=arrow_shape, tags='reaction_arrow')
+                    else:
+                        self.canvas.create_line(node[0] - scale_fx - dxy, node[1], node[0] - dxy, node[1],
+                                                arrow=tk.LAST,
+                                                width=2.5, fill="purple", arrowshape=arrow_shape, tags='reaction_arrow')
+                    f_x_label = f"R_x = {abs(f_x)} kN"
+                    label_offset_x = 60
+                    label_offset_y = -18.6
+                    self.canvas.create_text(node[0] - scale_fx - label_offset_x, node[1] + label_offset_y,
+                                            text=f_x_label, fill="purple", font=GUI_Settings.STANDARD_FONT_1,
+                                            tags='reaction_label')
+                if abs(f_y) > np.max((1, self.input_calc_param_init['delta_f_max'])):
+                    if f_y > 0:
+                        self.canvas.create_line(node[0], node[1] + scale_fy + dxy, node[0], node[1] + dxy,
+                                                arrow=tk.LAST,
+                                                width=2.5, fill="purple", arrowshape=arrow_shape, tags='reaction_arrow')
+                    else:
+                        self.canvas.create_line(node[0], node[1] + dxy, node[0], node[1] + scale_fy + dxy,
+                                                arrow=tk.LAST,
+                                                width=2.5, fill="purple", arrowshape=arrow_shape, tags='reaction_arrow')
+                    f_y_label = f"R_y = {abs(f_y)} kN"
+                    label_offset_x = 70
+                    label_offset_y = 25
+                    self.canvas.create_text(node[0] + label_offset_x, node[1] + scale_fy + label_offset_y,
+                                            text=f_y_label, fill="purple", font=GUI_Settings.STANDARD_FONT_1,
+                                            tags='reaction_label')
 
     def toggle_header(self):
         if self.show_header_state.get():
@@ -995,9 +1032,11 @@ class TrussAnalysisApp(tk.Tk):
         if calculation_type == 'linear':
             self.header_text = (f"Axial forces N_i [kN], Linear calculation\n"
                                 f"N_max = {max_force:.2f} kN, N_min = {min_force:.2f} kN")
+            reactions = self.solution['node_equilibrium_linear']
         else:
             self.header_text = (f"Axial forces N_i [kN], Nonlinear calculation\n"
                                 f"N_max = {max_force:.2f} kN, N_min = {min_force:.2f} kN")
+            reactions = self.solution['node_equilibrium_nonlinear']
         self.toggle_header()
 
         # Scaling and normalization
@@ -1065,6 +1104,7 @@ class TrussAnalysisApp(tk.Tk):
         # Draw coordinate system
         self.draw_coordinate_system()
         self.toggle_loads()
+        self.draw_reaction_forces(reactions)
         self.toggle_node_labels()
 
     def add_elements_form(self, parent_frame):
@@ -1862,6 +1902,7 @@ class TrussAnalysisApp(tk.Tk):
         self.force_number = 0
         self.support_number = 0
         self.max_force = 1
+        self.nodes = []
         self.solution = None
         self.plot_linear_deformation.config(state='disabled')
         self.plot_linear_forces.config(state='disabled')
