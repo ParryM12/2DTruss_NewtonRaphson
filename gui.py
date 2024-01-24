@@ -1656,7 +1656,7 @@ class TrussAnalysisApp(tk.Tk):
             else:
                 force_x = 0
             if self.force_y_entry.get():
-                force_x = float(self.force_y_entry.get())
+                force_y = float(self.force_y_entry.get())
             else:
                 force_y = 0
             # Check for duplicate load
