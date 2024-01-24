@@ -160,6 +160,8 @@ class TrussAnalysisApp(tk.Tk):
         self.add_calc_initialise = 0
         self.max_force = 1
         self.max_reaction_force = 1
+        self.edit_cx = 0
+        self.edit_cy = 0
         self.linear_displacement = None
         self.nonlinear_displacement = None
         self.nodes = []
@@ -592,7 +594,11 @@ class TrussAnalysisApp(tk.Tk):
     def update_calculation_information(self):
         info_text = "Calculation Results:\n"
         imbalance_info = ""
+        info_text_calc = ""
+        info_text_strain_nonlinear = ""
+        strain_nonlinear_info = []
         imbalance_tag = None
+        strain_nonlinear_tag = []
 
         if self.solution is not None:
             # Case: Nonlinear calculation
@@ -619,10 +625,28 @@ class TrussAnalysisApp(tk.Tk):
                 for element, force in enumerate(self.solution['axial_forces_nonlinear']):
                     info_text += f"Element {element}: N = {force} kN.\n"
 
+                # Strains - Nonlinear Calculation
+                info_text_strain_nonlinear += "\nElement strains (Nonlinear Calculation):\n"
+                for element, strain in enumerate(self.solution['strains_nonlinear']):
+                    eps_f_i = abs(self.input_elements[str(element)]['ele_eps_f'])
+                    beta_i = abs(self.input_elements[str(element)]['ele_quad_coeff'])
+                    if (abs(strain) <= eps_f_i) and (beta_i != 0):
+                        strain_nonlinear_info.append(f"Element {element}: |ε| = {round(abs(strain[0]) * 100, 4)} "
+                                                     f"≤ {eps_f_i * 100} [%].\n")
+                        strain_nonlinear_tag.append("green_text")
+                    elif abs(strain) > eps_f_i and (beta_i != 0):
+                        strain_nonlinear_info.append(f"Element {element}: |ε| = {round(abs(strain[0]) * 100, 4)} "
+                                                     f"> {eps_f_i * 100} [%].\n")
+                        strain_nonlinear_tag.append("red_text")
+                    elif beta_i == 0:
+                        strain_nonlinear_info.append(f"Element {element}: |ε| = {round(abs(strain[0]) * 100, 4)} [%]"
+                                                     f" (linear element).\n")
+                        strain_nonlinear_tag.append("green_text")
+
                 # Additional Information (iterations, force imbalance)
                 max_nodal_force_imbalance = max(abs(self.solution['node_forces_mismatch']))
                 delta_f_max = self.input_calc_param['delta_f_max']
-                info_text += "\nConvergence of the solution:\n"
+                info_text_calc = "\nConvergence of the solution:\n"
                 # Check nodal force imbalance and apply tag
                 if max_nodal_force_imbalance < delta_f_max:
                     imbalance_info = (f"SUCCESS: Termination criterion ΔF = {max_nodal_force_imbalance[0]} kN < "
@@ -653,7 +677,12 @@ class TrussAnalysisApp(tk.Tk):
         self.current_calculation_information.config(state='normal')
         self.current_calculation_information.delete(1.0, tk.END)
         self.current_calculation_information.insert(tk.END, info_text)
+        if strain_nonlinear_tag:
+            self.current_calculation_information.insert(tk.END, info_text_strain_nonlinear)
+            for key, strain_text in enumerate(strain_nonlinear_info):
+                self.current_calculation_information.insert(tk.END, strain_text, strain_nonlinear_tag[key])
         if imbalance_tag:
+            self.current_calculation_information.insert(tk.END, info_text_calc)
             self.current_calculation_information.insert(tk.END, imbalance_info, imbalance_tag)
 
         self.current_calculation_information.config(state='disabled')
@@ -744,14 +773,14 @@ class TrussAnalysisApp(tk.Tk):
             s_hline_dxy = 10
             dxy_hline = 36  # Defines the size of the horizontal line of
             # Support fixed in x- and y- direction:
-            if support['c_x'] == 1 and support['c_y'] == 1:
+            if support['c_x'] == '∞' and support['c_y'] == '∞':
                 points = [(x, y), (x - dxy, y + dxy), (x + dxy, y + dxy), (x, y)]
                 for i in range(len(points) - 1):
                     start = points[i]
                     end = points[i + 1]
                     self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
             # Support fixed only in x-direction:
-            if support['c_x'] == 1 and support['c_y'] != 1:
+            if support['c_x'] == '∞' and support['c_y'] != '∞':
                 points = [(x, y), (x + dxy, y - dxy), (x + dxy, y + dxy), (x, y)]
                 points_hline = [(x + dxy_hline, y - dxy_hline), (x + dxy_hline, y + dxy_hline)]
                 self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
@@ -761,7 +790,7 @@ class TrussAnalysisApp(tk.Tk):
                     end = points[i + 1]
                     self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
             # Support fixed only in y-direction:
-            if support['c_x'] != 1 and support['c_y'] == 1:
+            if support['c_x'] != '∞' and support['c_y'] == '∞':
                 points = [(x, y), (x - dxy, y + dxy), (x + dxy, y + dxy), (x, y)]
                 points_hline = [(x - dxy_hline, y + dxy_hline), (x + dxy_hline, y + dxy_hline)]
                 self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
@@ -771,31 +800,37 @@ class TrussAnalysisApp(tk.Tk):
                     end = points[i + 1]
                     self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
             # Support elastic in y-direction and free in x-direction:
-            if support['c_y'] > 1:
-                points = [(x, y), (x + s_dx / 2, y + s_dy / 2), (x - s_dx / 2, y + s_dy),
-                          (x + s_dx / 2, y + 1.5 * s_dy),
-                          (x - s_dx / 2, y + 2 * s_dy), (x + s_dx / 2, y + 2.5 * s_dy), (x - s_dx / 2, y + 2.5 * s_dy)]
-                points_hline = [(x - s_dx / 2 - s_hline_dxy, y + 2.5 * s_dy + s_hline_dxy/2),
-                                (x + s_dx / 2 + s_hline_dxy, y + 2.5 * s_dy + s_hline_dxy/2)]
-                self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
-                                        fill=color, width=2.5)
-                for i in range(len(points) - 1):
-                    start = points[i]
-                    end = points[i + 1]
-                    self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
+            if support['c_y'] != '∞':
+                if support['c_y'] > 0:
+                    points = [(x, y), (x + s_dx / 2, y + s_dy / 2), (x - s_dx / 2, y + s_dy),
+                              (x + s_dx / 2, y + 1.5 * s_dy),
+                              (x - s_dx / 2, y + 2 * s_dy), (x + s_dx / 2, y + 2.5 * s_dy),
+                              (x - s_dx / 2, y + 2.5 * s_dy)]
+                    points_hline = [(x - s_dx / 2 - s_hline_dxy, y + 2.5 * s_dy + s_hline_dxy / 2),
+                                    (x + s_dx / 2 + s_hline_dxy, y + 2.5 * s_dy + s_hline_dxy / 2)]
+                    self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0],
+                                            points_hline[1][1],
+                                            fill=color, width=2.5)
+                    for i in range(len(points) - 1):
+                        start = points[i]
+                        end = points[i + 1]
+                        self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
             # Support elastic in x-direction and free in y-direction:
-            if support['c_x'] > 1:
-                points = [(x, y), (x + s_dy / 2, y + s_dx / 2), (x + s_dy, y - s_dx / 2),
-                          (x + 1.5 * s_dy, y + s_dx / 2),
-                          (x + 2 * s_dy, y - s_dx / 2), (x + 2.5 * s_dy, y + s_dx / 2), (x + 2.5 * s_dy, y - s_dx / 2)]
-                points_hline = [(x + 2.5 * s_dy + s_hline_dxy/2, y - s_dx / 2 - s_hline_dxy),
-                                (x + 2.5 * s_dy + s_hline_dxy/2, y + s_dx / 2 + s_hline_dxy)]
-                self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0], points_hline[1][1],
-                                        fill=color, width=2.5)
-                for i in range(len(points) - 1):
-                    start = points[i]
-                    end = points[i + 1]
-                    self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
+            if support['c_x'] != '∞':
+                if support['c_x'] > 0:
+                    points = [(x, y), (x + s_dy / 2, y + s_dx / 2), (x + s_dy, y - s_dx / 2),
+                              (x + 1.5 * s_dy, y + s_dx / 2),
+                              (x + 2 * s_dy, y - s_dx / 2), (x + 2.5 * s_dy, y + s_dx / 2),
+                              (x + 2.5 * s_dy, y - s_dx / 2)]
+                    points_hline = [(x + 2.5 * s_dy + s_hline_dxy / 2, y - s_dx / 2 - s_hline_dxy),
+                                    (x + 2.5 * s_dy + s_hline_dxy / 2, y + s_dx / 2 + s_hline_dxy)]
+                    self.canvas.create_line(points_hline[0][0], points_hline[0][1], points_hline[1][0],
+                                            points_hline[1][1],
+                                            fill=color, width=2.5)
+                    for i in range(len(points) - 1):
+                        start = points[i]
+                        end = points[i + 1]
+                        self.canvas.create_line(start[0], start[1], end[0], end[1], fill=color, width=2.5)
             # Draw hinge at node
             self.canvas.create_oval(node[0] - hinge_radius, node[1] - hinge_radius,
                                     node[0] + hinge_radius, node[1] + hinge_radius, outline=color, fill="white",
@@ -805,36 +840,42 @@ class TrussAnalysisApp(tk.Tk):
         # Draw Loads
         dxy = 13
         arrow_shape = (10, 12, 5)  # Length, Length, Width of the arrow. Adjust as needed.
+        self.max_force = 1
+        # Determine max force for scaling
+        for load in self.input_forces.values():
+            f_x, f_y = load['f_x'], load['f_y']
+            self.max_force = max(self.max_force, abs(f_x), abs(f_y))
+        # Draw loads
         for load in self.input_forces.values():
             node = self.scale_and_translate(*load['force_node'])
             f_x, f_y = load['f_x'], load['f_y']
-            self.max_force = max(self.max_force, abs(f_x), abs(f_y))
-            scale_fx = abs(f_x / self.max_force) * 90
-            scale_fy = abs(f_y / self.max_force) * 90
+            scale_fx = np.max((abs(f_x / self.max_force) * 80, 20))
+            scale_fy = np.max((abs(f_y / self.max_force) * 80, 20))
+
             if f_x != 0:
                 if f_x > 0:
-                    self.canvas.create_line(node[0] + dxy, node[1], node[0] + scale_fx, node[1], arrow=tk.LAST,
+                    self.canvas.create_line(node[0] + dxy, node[1], node[0] + scale_fx + dxy, node[1], arrow=tk.LAST,
                                             width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 else:
-                    self.canvas.create_line(node[0] + scale_fx, node[1], node[0] + dxy, node[1], arrow=tk.LAST,
+                    self.canvas.create_line(node[0] + scale_fx + dxy, node[1], node[0] + dxy, node[1], arrow=tk.LAST,
                                             width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 f_x_label = f"H = {abs(f_x)} kN"
-                label_offset_x = 11.7
+                label_offset_x = 18
                 label_offset_y = -14.6
-                self.canvas.create_text(node[0] + scale_fx + label_offset_x, node[1] + label_offset_y,
+                self.canvas.create_text(node[0] + scale_fx + label_offset_x + dxy, node[1] + label_offset_y,
                                         text=f_x_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1,
                                         tags='load_label')
             if f_y != 0:
                 if f_y > 0:
-                    self.canvas.create_line(node[0], node[1] - scale_fy, node[0], node[1] - dxy, arrow=tk.LAST,
+                    self.canvas.create_line(node[0], node[1] - scale_fy - dxy, node[0], node[1] - dxy, arrow=tk.LAST,
                                             width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 else:
-                    self.canvas.create_line(node[0], node[1] - dxy, node[0], node[1] - scale_fy, arrow=tk.LAST,
+                    self.canvas.create_line(node[0], node[1] - dxy, node[0], node[1] - scale_fy - dxy, arrow=tk.LAST,
                                             width=2.5, fill="blue", arrowshape=arrow_shape, tags='load_arrow')
                 f_y_label = f"F = {abs(f_y)} kN"
                 label_offset_x = 7.3
                 label_offset_y = -13.1
-                self.canvas.create_text(node[0] + label_offset_x, node[1] - scale_fy + label_offset_y,
+                self.canvas.create_text(node[0] + label_offset_x, node[1] - scale_fy + label_offset_y - dxy,
                                         text=f_y_label, fill="blue", font=GUI_Settings.STANDARD_FONT_1,
                                         tags='load_label')
 
@@ -1145,10 +1186,12 @@ class TrussAnalysisApp(tk.Tk):
         self.strain_entry = ttk.Entry(frame)
         self.strain_entry.grid(row=6, column=1, sticky='ew', padx=5, pady=1)
 
-        # Create Button to add the element
-        ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=7, columnspan=2, pady=7)
         # Create Button to edit an element
-        ttk.Button(frame, text="Edit/Delete Element", command=self.edit_element).grid(row=8, columnspan=2, pady=3)
+        ttk.Button(frame, text="Edit/Delete Element", command=self.edit_element).grid(row=7, column=0, pady=7, padx=17,
+                                                                                      sticky='ew')
+        # Create Button to add the element
+        ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=7, column=1, pady=7, padx=10,
+                                                                             sticky='ew')
 
     def add_supports_form(self, parent_frame):
         # Create Frame
@@ -1164,18 +1207,54 @@ class TrussAnalysisApp(tk.Tk):
         self.support_node_entry = ttk.Entry(frame)
         self.support_node_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=1)
 
-        ttk.Label(frame, text="Stiffness c_x [kN/m]:").grid(row=1, column=0, sticky='w')
+        ttk.Label(frame, text="Rigid in x-direction:").grid(row=1, column=0, sticky='w')
+        self.support_rigid_cx_state = tk.BooleanVar(value=True)
+        self.support_rigid_cx = ttk.Checkbutton(frame, variable=self.support_rigid_cx_state,
+                                                command=self.toggle_stiffness_cx)
+        self.support_rigid_cx.grid(row=1, column=1, sticky='w', padx=5)
+
+        ttk.Label(frame, text="Rigid in y-direction:").grid(row=2, column=0, sticky='w')
+        self.support_rigid_cy_state = tk.BooleanVar(value=True)
+        self.support_rigid_cy = ttk.Checkbutton(frame, variable=self.support_rigid_cy_state,
+                                                command=self.toggle_stiffness_cy)
+        self.support_rigid_cy.grid(row=2, column=1, sticky='w', padx=5)
+
+        ttk.Label(frame, text="Stiffness c_x [kN/m]:").grid(row=3, column=0, sticky='w')
         self.stiffness_cx_entry = ttk.Entry(frame)
-        self.stiffness_cx_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=0)
+        self.stiffness_cx_entry.grid(row=3, column=1, sticky='ew', padx=5, pady=0)
+        self.toggle_stiffness_cx()
 
-        ttk.Label(frame, text="Stiffness c_y [kN/m]:").grid(row=2, column=0, sticky='w')
+        ttk.Label(frame, text="Stiffness c_y [kN/m]:").grid(row=4, column=0, sticky='w')
         self.stiffness_cy_entry = ttk.Entry(frame)
-        self.stiffness_cy_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
+        self.stiffness_cy_entry.grid(row=4, column=1, sticky='ew', padx=5, pady=1)
+        self.toggle_stiffness_cy()
 
-        # Create Button to add the support
-        ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=3, columnspan=2, pady=7)
         # Create Button to edit a support
-        ttk.Button(frame, text="Edit/Delete Support", command=self.edit_support).grid(row=4, columnspan=2, pady=3)
+        ttk.Button(frame, text="Edit/Delete Support", command=self.edit_support).grid(row=5, column=0, pady=7, padx=17,
+                                                                                      sticky='ew')
+        # Create Button to add the support
+        ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=5, column=1, pady=7, padx=10,
+                                                                             sticky='ew')
+
+    def toggle_stiffness_cx(self):
+        if self.support_rigid_cx_state.get():
+            self.stiffness_cx_entry.delete(0, tk.END)
+            self.stiffness_cx_entry.insert(0, '∞')
+            self.stiffness_cx_entry.configure(state='readonly')
+        else:
+            self.stiffness_cx_entry.configure(state='normal')
+            self.stiffness_cx_entry.delete(0, tk.END)
+            self.stiffness_cx_entry.insert(0, '0')
+
+    def toggle_stiffness_cy(self):
+        if self.support_rigid_cy_state.get():
+            self.stiffness_cy_entry.delete(0, tk.END)
+            self.stiffness_cy_entry.insert(0, '∞')
+            self.stiffness_cy_entry.configure(state='readonly')
+        else:
+            self.stiffness_cy_entry.configure(state='normal')
+            self.stiffness_cy_entry.delete(0, tk.END)
+            self.stiffness_cy_entry.insert(0, '0')
 
     def add_loads_form(self, parent_frame):
         # Create Frame
@@ -1200,10 +1279,12 @@ class TrussAnalysisApp(tk.Tk):
         self.force_y_entry = ttk.Entry(frame)
         self.force_y_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
 
-        # Create Button to add the load
-        ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, columnspan=2, pady=7)
         # Create Button to edit a load
-        ttk.Button(frame, text="Edit/Delete Load", command=self.edit_load).grid(row=4, columnspan=2, pady=3)
+        ttk.Button(frame, text="Edit/Delete Load", command=self.edit_load).grid(row=3, column=0, pady=7, padx=17,
+                                                                                sticky='ew')
+        # Create Button to add the load
+        ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, column=1, pady=7, padx=10,
+                                                                       sticky='ew')
 
     def calculation_settings_form(self, parent_frame):
         # Create Frame
@@ -1247,11 +1328,57 @@ class TrussAnalysisApp(tk.Tk):
                 return
 
             # Parse other fields like area, Young's modulus, coefficients, etc.
-            area = float(self.area_entry.get())
-            emod = float(self.emod_entry.get())
-            lin_coeff = float(self.lin_coeff_entry.get())
-            quad_coeff = float(self.quad_coeff_entry.get())
-            strain_entry = float(self.strain_entry.get())
+            if self.area_entry.get():
+                if float(self.area_entry.get()) < 0:
+                    messagebox.showwarning("Warning", f"Value of the cross-section area A is negative! "
+                                                      f"The value of A is automatically set to positive.")
+                area = np.abs(float(self.area_entry.get()))
+            else:
+                messagebox.showwarning("Warning", f"Value of the cross-section area A is empty! "
+                                                  f"Please insert a value A > 0!")
+                return
+            if self.emod_entry.get():
+                if float(self.emod_entry.get()) < 0:
+                    messagebox.showwarning("Error", f"Value of the Young's modulus E is negative! "
+                                                    f"The value of E is automatically set to positive.")
+                emod = np.abs(float(self.emod_entry.get()))
+            else:
+                messagebox.showwarning("Error", f"Value of the Young's modulus E is empty! "
+                                                f"Please insert a value E > 0!")
+                return
+            if self.lin_coeff_entry.get():
+                if float(self.lin_coeff_entry.get()) < 0:
+                    messagebox.showwarning("Warning", f"Value of the linear coefficient α is negative! "
+                                                      f"The value of α is automatically set to positive.")
+                lin_coeff = np.abs(float(self.lin_coeff_entry.get()))
+            else:
+                lin_coeff = 1
+                messagebox.showwarning("Error", f"Value of the linear coefficient α is empty! "
+                                                f"The coefficient is set to the default value α = 1. ")
+            if self.quad_coeff_entry.get():
+                if float(self.quad_coeff_entry.get()) < 0:
+                    messagebox.showwarning("Warning", f"Value of the quadratic coefficient β is negative! "
+                                                      f"The value of β is automatically set to positive. The sign will "
+                                                      f"automatically change in the calculation depending on whether "
+                                                      f"the element is subjected to tensile or compressive stress.")
+                quad_coeff = np.abs(float(self.quad_coeff_entry.get()))
+            else:
+                quad_coeff = 0
+                messagebox.showwarning("Error", f"Value of the quadratic coefficient β is empty! "
+                                                f"The coefficient is set to the default value β = 0 "
+                                                f"(linear calculation). ")
+            if self.strain_entry.get():
+                if float(self.strain_entry.get()) < 0:
+                    messagebox.showwarning("Warning", f"Value of the limit strain ε is negative! "
+                                                      f"The value of ε is automatically set to positive. The sign will "
+                                                      f"automatically change in the calculation depending on whether "
+                                                      f"the element is subjected to tensile or compressive stress.")
+                strain_entry = np.abs(float(self.strain_entry.get()))
+            else:
+                strain_entry = 0
+                messagebox.showwarning("Error", f"Value of the limit strain ε is empty! "
+                                                f"The limit strain is set to the default value ε = 0 "
+                                                f"(linear calculation). ")
 
             # Check for duplicate element
             if self.add_element_initialise == 1:
@@ -1298,7 +1425,7 @@ class TrussAnalysisApp(tk.Tk):
 
         except Exception as e:
             # Show a warning message box
-            messagebox.showerror("Error", f"An error occurred while adding the element: {e}")
+            messagebox.showerror("Error", f"An error occurred while adding the element: {e} !")
             print(f"An error occurred while adding the element: {e}")
             return
 
@@ -1387,40 +1514,94 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_strain_entry.insert(0, f"{element['ele_eps_f']}")
 
     def save_element_changes(self):
-        selected_index = self.element_dropdown.current()
-        element_id = list(self.input_elements.keys())[selected_index]
-        # Parse values from entry boxes
-        node_i = self.parse_coordinates(self.edit_node_i_entry.get())
-        node_j = self.parse_coordinates(self.edit_node_j_entry.get())
-        area = float(self.edit_area_entry.get())
-        emod = float(self.edit_emod_entry.get())
-        lin_coeff = float(self.edit_lin_coeff_entry.get())
-        quad_coeff = float(self.edit_quad_coeff_entry.get())
-        strain_entry = float(self.edit_strain_entry.get())
+        try:
+            selected_index = self.element_dropdown.current()
+            element_id = list(self.input_elements.keys())[selected_index]
+            # Parse values from entry boxes
+            node_i = self.parse_coordinates(self.edit_node_i_entry.get())
+            node_j = self.parse_coordinates(self.edit_node_j_entry.get())
 
-        # Update the element in the input_elements dictionary
-        self.input_elements[element_id] = {
-            'ele_number': int(element_id),
-            'ele_node_i': node_i,
-            'ele_node_j': node_j,
-            'ele_A': area,
-            'ele_E': emod,
-            'ele_lin_coeff': lin_coeff,
-            'ele_quad_coeff': quad_coeff,
-            'ele_eps_f': strain_entry}
-        # Update information window
-        self.update_system_information()
-        # Draw elements, supports and loads on canvas
-        self.canvas.delete("all")  # Clear the canvas
-        # Create grid, if selected
-        self.toggle_grid()
-        self.draw_coordinate_system()
-        self.draw_element()
-        self.draw_support('black', None)
-        self.toggle_loads()
-        self.toggle_node_labels()
-        # Close window
-        self.edit_window.destroy()
+            # Parse other fields like area, Young's modulus, coefficients, etc.
+            if self.edit_area_entry.get():
+                if float(self.edit_area_entry.get()) < 0:
+                    messagebox.showwarning("Warning", f"Value of the cross-section area A is negative! "
+                                                      f"The value of A is automatically set to positive.")
+                area = np.abs(float(self.edit_area_entry.get()))
+            else:
+                messagebox.showwarning("Warning", f"Value of the cross-section area A is empty! "
+                                                  f"Please insert a value A > 0!")
+                return
+            if self.edit_emod_entry.get():
+                if float(self.edit_emod_entry.get()) < 0:
+                    messagebox.showwarning("Error", f"Value of the Young's modulus E is negative! "
+                                                    f"The value of E is automatically set to positive.")
+                emod = np.abs(float(self.edit_emod_entry.get()))
+            else:
+                messagebox.showwarning("Error", f"Value of the Young's modulus E is empty! "
+                                                f"Please insert a value E > 0!")
+                return
+            if self.edit_lin_coeff_entry.get():
+                if float(self.edit_lin_coeff_entry.get()) < 0:
+                    messagebox.showwarning("Warning", f"Value of the linear coefficient α is negative! "
+                                                      f"The value of α is automatically set to positive.")
+                lin_coeff = np.abs(float(self.edit_lin_coeff_entry.get()))
+            else:
+                lin_coeff = 1
+                messagebox.showwarning("Error", f"Value of the linear coefficient α is empty! "
+                                                f"The coefficient is set to the default value α = 1. ")
+            if self.edit_quad_coeff_entry.get():
+                if float(self.edit_quad_coeff_entry.get()) < 0:
+                    messagebox.showwarning("Warning", f"Value of the quadratic coefficient β is negative! "
+                                                      f"The value of β is automatically set to positive. The sign will "
+                                                      f"automatically change in the calculation depending on whether "
+                                                      f"the element is subjected to tensile or compressive stress.")
+                quad_coeff = np.abs(float(self.edit_quad_coeff_entry.get()))
+            else:
+                quad_coeff = 0
+                messagebox.showwarning("Error", f"Value of the quadratic coefficient β is empty! "
+                                                f"The coefficient is set to the default value β = 0 "
+                                                f"(linear calculation). ")
+            if self.edit_strain_entry.get():
+                if float(self.edit_strain_entry.get()) < 0:
+                    messagebox.showwarning("Warning", f"Value of the limit strain ε is negative! "
+                                                      f"The value of ε is automatically set to positive. The sign will "
+                                                      f"automatically change in the calculation depending on whether "
+                                                      f"the element is subjected to tensile or compressive stress.")
+                strain_entry = np.abs(float(self.edit_strain_entry.get()))
+            else:
+                strain_entry = 0
+                messagebox.showwarning("Error", f"Value of the limit strain ε is empty! "
+                                                f"The limit strain is set to the default value ε = 0 "
+                                                f"(linear calculation). ")
+
+            # Update the element in the input_elements dictionary
+            self.input_elements[element_id] = {
+                'ele_number': int(element_id),
+                'ele_node_i': node_i,
+                'ele_node_j': node_j,
+                'ele_A': area,
+                'ele_E': emod,
+                'ele_lin_coeff': lin_coeff,
+                'ele_quad_coeff': quad_coeff,
+                'ele_eps_f': strain_entry}
+            # Update information window
+            self.update_system_information()
+            # Draw elements, supports and loads on canvas
+            self.canvas.delete("all")  # Clear the canvas
+            # Create grid, if selected
+            self.toggle_grid()
+            self.draw_coordinate_system()
+            self.draw_element()
+            self.draw_support('black', None)
+            self.toggle_loads()
+            self.toggle_node_labels()
+            # Close window
+            self.edit_window.destroy()
+        except Exception as e:
+            # Show a warning message box
+            messagebox.showerror("Error", f"An error occurred while adding the element: {e}")
+            print(f"An error occurred while adding the element: {e}")
+            return
 
     def update_element_dropdown(self):
         element_ids = list(self.input_elements.keys())
@@ -1470,8 +1651,14 @@ class TrussAnalysisApp(tk.Tk):
             if force_node is None:
                 return
 
-            force_x = float(self.force_x_entry.get())
-            force_y = float(self.force_y_entry.get())
+            if self.force_x_entry.get():
+                force_x = float(self.force_x_entry.get())
+            else:
+                force_x = 0
+            if self.force_y_entry.get():
+                force_x = float(self.force_y_entry.get())
+            else:
+                force_y = 0
             # Check for duplicate load
             if self.add_load_initialise == 1:
                 for key, force in self.input_forces.items():
@@ -1504,7 +1691,9 @@ class TrussAnalysisApp(tk.Tk):
             self.toggle_loads()
             self.toggle_node_labels()
         except Exception as e:
-            print(f"An error occurred while adding the load: {e}")
+            # Show a warning message box
+            messagebox.showerror("Error", f"An error occurred while adding the load: {e}")
+            return
 
     def edit_load(self):
         self.edit_window_load = tk.Toplevel(self)
@@ -1563,31 +1752,42 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_force_y_entry.insert(0, f"{force['f_y']}")
 
     def save_load_changes(self):
-        selected_index = self.load_dropdown.current()
-        force_id = list(self.input_forces.keys())[selected_index]
-        # Parse values from entry boxes
-        force_node = self.parse_coordinates(self.edit_force_node_entry.get())
-        f_x = float(self.edit_force_x_entry.get())
-        f_y = float(self.edit_force_y_entry.get())
+        try:
+            selected_index = self.load_dropdown.current()
+            force_id = list(self.input_forces.keys())[selected_index]
+            # Parse values from entry boxes
+            force_node = self.parse_coordinates(self.edit_force_node_entry.get())
+            if self.edit_force_x_entry.get():
+                f_x = float(self.edit_force_x_entry.get())
+            else:
+                f_x = 0
+            if self.edit_force_y_entry.get():
+                f_y = float(self.edit_force_y_entry.get())
+            else:
+                f_y = 0
 
-        # Update the load in the input_elements dictionary
-        self.input_forces[force_id] = {
-            'force_number': int(force_id),
-            'force_node': force_node,
-            'f_x': f_x,
-            'f_y': f_y}
-        # Update information window
-        self.update_system_information()
-        # Draw elements, supports and loads on canvas
-        self.canvas.delete("all")  # Clear the canvas
-        self.toggle_grid()
-        self.draw_coordinate_system()
-        self.draw_element()
-        self.draw_support('black', None)
-        self.toggle_loads()
-        self.toggle_node_labels()
-        # Close window
-        self.edit_window_load.destroy()
+            # Update the load in the input_elements dictionary
+            self.input_forces[force_id] = {
+                'force_number': int(force_id),
+                'force_node': force_node,
+                'f_x': f_x,
+                'f_y': f_y}
+            # Update information window
+            self.update_system_information()
+            # Draw elements, supports and loads on canvas
+            self.canvas.delete("all")  # Clear the canvas
+            self.toggle_grid()
+            self.draw_coordinate_system()
+            self.draw_element()
+            self.draw_support('black', None)
+            self.toggle_loads()
+            self.toggle_node_labels()
+            # Close window
+            self.edit_window_load.destroy()
+        except Exception as e:
+            # Show a warning message box
+            messagebox.showerror("Error", f"An error occurred while adding the load: {e}")
+            return
 
     def update_load_dropdown(self):
         load_ids = list(self.input_forces.keys())
@@ -1632,13 +1832,34 @@ class TrussAnalysisApp(tk.Tk):
         try:
             # Parse the coordinates from the entry fields
             support_node = self.parse_coordinates(self.support_node_entry.get())
-
             # Do not proceed further if the coordinates are invalid
             if support_node is None:
                 return
-
-            c_x = float(self.stiffness_cx_entry.get())
-            c_y = float(self.stiffness_cy_entry.get())
+            # Parse stiffness
+            if self.stiffness_cx_entry.get():
+                if self.stiffness_cx_entry.get() != '∞':
+                    if float(self.stiffness_cx_entry.get()) < 0:
+                        messagebox.showwarning("Warning", f"Value of the spring stiffness c_x is negative! "
+                                                          f"The value of c_x is automatically set to positive.")
+                    c_x = abs(float(self.stiffness_cx_entry.get()))
+                else:
+                    c_x = self.stiffness_cx_entry.get()
+            else:
+                messagebox.showwarning("Warning", f"Value of the spring stiffness c_x is empty! "
+                                                  f"The value of the spring stiffness is set to c_x = 0!")
+                c_x = 0
+            if self.stiffness_cy_entry.get():
+                if self.stiffness_cy_entry.get() != '∞':
+                    if float(self.stiffness_cy_entry.get()) < 0:
+                        messagebox.showwarning("Warning", f"Value of the spring stiffness c_y is negative! "
+                                                          f"The value of c_y is automatically set to positive.")
+                    c_y = abs(float(self.stiffness_cy_entry.get()))
+                else:
+                    c_y = self.stiffness_cy_entry.get()
+            else:
+                messagebox.showwarning("Warning", f"Value of the spring stiffness c_y is empty! "
+                                                  f"The value of the spring stiffness is set to c_y = 0!")
+                c_y = 0
 
             # Check for duplicate support
             if self.add_load_initialise == 1:
@@ -1674,7 +1895,9 @@ class TrussAnalysisApp(tk.Tk):
             self.toggle_node_labels()
 
         except Exception as e:
-            print(f"An error occurred while adding the support: {e}")
+            # Show a warning message box
+            messagebox.showerror("Error", f"An error occurred while adding the support: {e}")
+            return
 
     def edit_support(self):
         self.edit_window_support = tk.Toplevel(self)
@@ -1698,19 +1921,31 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_support_node_entry = ttk.Entry(edit_frame)
         self.edit_support_node_entry.grid(row=1, column=1, sticky='ew', padx=5)
 
-        ttk.Label(edit_frame, text="Stiffness c_x [kN/m]:").grid(row=2, column=0, sticky='w')
-        self.edit_stiffness_cx_entry = ttk.Entry(edit_frame)
-        self.edit_stiffness_cx_entry.grid(row=2, column=1, sticky='ew', padx=5)
+        ttk.Label(edit_frame, text="Rigid in x-direction:").grid(row=2, column=0, sticky='w')
+        self.edit_support_rigid_cx_state = tk.BooleanVar(value=True)
+        self.edit_support_rigid_cx = ttk.Checkbutton(edit_frame, variable=self.edit_support_rigid_cx_state,
+                                                     command=self.toggle_edit_stiffness_cx)
+        self.edit_support_rigid_cx.grid(row=2, column=1, sticky='w', padx=5)
 
-        ttk.Label(edit_frame, text="Stiffness c_y [kN/m]:").grid(row=3, column=0, sticky='w')
+        ttk.Label(edit_frame, text="Rigid in y-direction:").grid(row=3, column=0, sticky='w')
+        self.edit_support_rigid_cy_state = tk.BooleanVar(value=True)
+        self.edit_support_rigid_cy = ttk.Checkbutton(edit_frame, variable=self.edit_support_rigid_cy_state,
+                                                     command=self.toggle_edit_stiffness_cy)
+        self.edit_support_rigid_cy.grid(row=3, column=1, sticky='w', padx=5)
+
+        ttk.Label(edit_frame, text="Stiffness c_x [kN/m]:").grid(row=4, column=0, sticky='w')
+        self.edit_stiffness_cx_entry = ttk.Entry(edit_frame)
+        self.edit_stiffness_cx_entry.grid(row=4, column=1, sticky='ew', padx=5)
+
+        ttk.Label(edit_frame, text="Stiffness c_y [kN/m]:").grid(row=5, column=0, sticky='w')
         self.edit_stiffness_cy_entry = ttk.Entry(edit_frame)
-        self.edit_stiffness_cy_entry.grid(row=3, column=1, sticky='ew', padx=5)
+        self.edit_stiffness_cy_entry.grid(row=5, column=1, sticky='ew', padx=5, pady=1)
 
         # Button for saving changes
-        ttk.Button(edit_frame, text="Save Changes", command=self.save_support_changes).grid(row=4, column=1, padx=5,
+        ttk.Button(edit_frame, text="Save Changes", command=self.save_support_changes).grid(row=6, column=1, padx=5,
                                                                                             pady=10)
         # Button for deleting the selected support
-        ttk.Button(edit_frame, text="Delete Support", command=self.delete_support).grid(row=4, column=0, padx=5)
+        ttk.Button(edit_frame, text="Delete Support", command=self.delete_support).grid(row=6, column=0, padx=5)
 
         # Initially populate the entry boxes with the current values of the first support
         self.populate_support_fields()
@@ -1718,46 +1953,109 @@ class TrussAnalysisApp(tk.Tk):
         # Call update_support_dropdown to initialize the combobox values
         self.update_support_dropdown()
 
+    def toggle_edit_stiffness_cx(self):
+        if self.edit_support_rigid_cx_state.get():
+            self.edit_stiffness_cx_entry.delete(0, tk.END)
+            self.edit_stiffness_cx_entry.insert(0, '∞')
+            self.edit_stiffness_cx_entry.configure(state='readonly')
+        else:
+            self.edit_stiffness_cx_entry.configure(state='normal')
+            self.edit_stiffness_cx_entry.delete(0, tk.END)
+            self.edit_stiffness_cx_entry.insert(0, str(self.edit_cx))
+
+    def toggle_edit_stiffness_cy(self):
+        if self.edit_support_rigid_cy_state.get():
+            self.edit_stiffness_cy_entry.delete(0, tk.END)
+            self.edit_stiffness_cy_entry.insert(0, '∞')
+            self.edit_stiffness_cy_entry.configure(state='readonly')
+        else:
+            self.edit_stiffness_cy_entry.configure(state='normal')
+            self.edit_stiffness_cy_entry.delete(0, tk.END)
+            self.edit_stiffness_cy_entry.insert(0, str(self.edit_cy))
+
     def populate_support_fields(self, event=None):
         selected_index = self.support_dropdown.current()
         support_id = list(self.input_supports.keys())[selected_index]
         support = self.input_supports[support_id]
-
         self.edit_support_node_entry.delete(0, tk.END)
         self.edit_support_node_entry.insert(0, f"{support['sup_node'][0]}, {support['sup_node'][1]}")
 
         self.edit_stiffness_cx_entry.delete(0, tk.END)
         self.edit_stiffness_cx_entry.insert(0, f"{support['c_x']}")
+        if support['c_x'] == '∞':
+            self.edit_stiffness_cx_entry.configure(state='readonly')
+            self.edit_support_rigid_cx_state.set(True)
+        else:
+            self.edit_stiffness_cx_entry.configure(state='normal')
+            self.edit_support_rigid_cx_state.set(False)
+            self.edit_cx = support['c_x']
 
         self.edit_stiffness_cy_entry.delete(0, tk.END)
         self.edit_stiffness_cy_entry.insert(0, f"{support['c_y']}")
+        if support['c_y'] == '∞':
+            self.edit_stiffness_cy_entry.configure(state='readonly')
+            self.edit_support_rigid_cy_state.set(True)
+        else:
+            self.edit_stiffness_cy_entry.configure(state='normal')
+            self.edit_support_rigid_cy_state.set(False)
+            self.edit_cy = support['c_y']
+
+        self.toggle_edit_stiffness_cx()
+        self.toggle_edit_stiffness_cy()
 
     def save_support_changes(self):
-        selected_index = self.support_dropdown.current()
-        support_id = list(self.input_supports.keys())[selected_index]
-        # Parse values from entry boxes
-        support_node = self.parse_coordinates(self.edit_support_node_entry.get())
-        c_x = float(self.edit_stiffness_cx_entry.get())
-        c_y = float(self.edit_stiffness_cy_entry.get())
+        try:
+            selected_index = self.support_dropdown.current()
+            support_id = list(self.input_supports.keys())[selected_index]
+            # Parse values from entry boxes
+            support_node = self.parse_coordinates(self.edit_support_node_entry.get())
+            if self.edit_stiffness_cx_entry.get():
+                if self.edit_stiffness_cx_entry.get() != '∞':
+                    if float(self.edit_stiffness_cx_entry.get()) < 0:
+                        messagebox.showwarning("Warning", f"Value of the spring stiffness c_x is negative! "
+                                                          f"The value of c_x is automatically set to positive.")
+                    c_x = abs(float(self.edit_stiffness_cx_entry.get()))
+                else:
+                    c_x = self.edit_stiffness_cx_entry.get()
+            else:
+                messagebox.showwarning("Warning", f"Value of the spring stiffness c_x is empty! "
+                                                  f"The of the spring stiffness is set to c_x = 0!")
+                c_x = 0
+            if self.edit_stiffness_cy_entry.get():
+                if self.edit_stiffness_cy_entry.get() != '∞':
+                    if float(self.edit_stiffness_cy_entry.get()) < 0:
+                        messagebox.showwarning("Warning", f"Value of the spring stiffness c_y is negative! "
+                                                          f"The value of c_y is automatically set to positive.")
+                    c_y = abs(float(self.edit_stiffness_cy_entry.get()))
+                else:
+                    c_y = self.edit_stiffness_cy_entry.get()
+            else:
+                messagebox.showwarning("Warning", f"Value of the spring stiffness c_y is empty! "
+                                                  f"The of the spring stiffness is set to c_y = 0!")
+                c_y = 0
 
-        # Update the load in the input_elements dictionary
-        self.input_supports[support_id] = {
-            'sup_number': int(support_id),
-            'sup_node': support_node,
-            'c_x': c_x,
-            'c_y': c_y}
-        # Update information window
-        self.update_system_information()
-        # Draw elements, supports and loads on canvas
-        self.canvas.delete("all")  # Clear the canvas
-        self.toggle_grid()
-        self.draw_coordinate_system()
-        self.draw_element()
-        self.draw_support('black', None)
-        self.toggle_loads()
-        self.toggle_node_labels()
-        # Close window
-        self.edit_window_support.destroy()
+            # Update the load in the input_elements dictionary
+            self.input_supports[support_id] = {
+                'sup_number': int(support_id),
+                'sup_node': support_node,
+                'c_x': c_x,
+                'c_y': c_y}
+            # Update information window
+            self.update_system_information()
+            # Draw elements, supports and loads on canvas
+            self.canvas.delete("all")  # Clear the canvas
+            self.toggle_grid()
+            self.draw_coordinate_system()
+            self.draw_element()
+            self.draw_support('black', None)
+            self.toggle_loads()
+            self.toggle_node_labels()
+            # Close window
+            self.edit_window_support.destroy()
+        except Exception as e:
+            # Show a warning message box
+            messagebox.showerror("Error", f"An error occurred while adding the support: {e}")
+            return
 
     def update_support_dropdown(self):
         support_ids = list(self.input_supports.keys())
@@ -1799,28 +2097,33 @@ class TrussAnalysisApp(tk.Tk):
         self.update_support_dropdown()
 
     def calc_settings(self):
-        # Get settings from calc setting form
-        method = str(self.method_dict[self.method_combobox.get()])
-        if method != 'linear':
-            try:
-                number_of_iterations = int(self.num_iterations_entry.get())
-                delta_f = float(self.delta_f_entry.get())
-            except ValueError as e:
-                # Show a warning message box
-                messagebox.showwarning("Warning", "Number of iterations must be an integer!")
-                return
-        else:
-            number_of_iterations = 0
-            delta_f = 0
+        try:
+            # Get settings from calc setting form
+            method = str(self.method_dict[self.method_combobox.get()])
+            if method != 'linear':
+                try:
+                    number_of_iterations = abs(int(self.num_iterations_entry.get()))
+                    delta_f = abs(float(self.delta_f_entry.get()))
+                except ValueError as e:
+                    # Show a warning message box
+                    messagebox.showwarning("Warning", "Number of iterations must be an integer!")
+                    return
+            else:
+                number_of_iterations = 0
+                delta_f = 0
 
-        # Add the new load to the input_forces dictionary
-        self.input_calc_param = {'calc_method': method,
-                                 'number_of_iterations': number_of_iterations,
-                                 'delta_f_max': delta_f}
-        # Set calculation parameter initializer to 1, required to overwrite initial parameters properly
-        self.add_calc_initialise = 1
-        # Update information window
-        self.update_system_information()
+            # Add the new load to the input_forces dictionary
+            self.input_calc_param = {'calc_method': method,
+                                     'number_of_iterations': number_of_iterations,
+                                     'delta_f_max': delta_f}
+            # Set calculation parameter initializer to 1, required to overwrite initial parameters properly
+            self.add_calc_initialise = 1
+            # Update information window
+            self.update_system_information()
+        except Exception as e:
+            # Show a warning message box
+            messagebox.showerror("Error", f"An error occurred while saving the calculation settings: {e}")
+            return
 
     def parse_coordinates(self, coord_str: str) -> tuple[float, float]:
         # Removing common bracket types and spaces
@@ -1835,57 +2138,65 @@ class TrussAnalysisApp(tk.Tk):
             return None
 
     def run_calculation(self):
-        # Check Input parameters for errors:
-        ele_quad_coeff = []
-        for ele_id, ele_values in self.input_elements.items():
-            ele_quad_coeff.append(abs(ele_values['ele_quad_coeff']))
-        if (self.input_calc_param['calc_method'] in 'NR' or self.input_calc_param['calc_method'] in 'modNR') and sum(
-                ele_quad_coeff) == 0:
-            messagebox.showwarning("Warning", f"You selected a nonlinear Newton-Raphson calculation, "
-                                              f"but you set the nonlinear parameter β of all elements to 0! "
-                                              f"Calculating linear...")
-            self.input_calc_param['calc_method'] = 'linear'
-            self.method_combobox.current(0)
-        # Run Calculation
-        calculation = Calculation(self.input_elements, self.input_supports, self.input_forces, self.input_calc_param)
-        self.solution = calculation.return_solution()
-        if self.solution is not None and self.solution['error_linalg'] is None:
-            # Check if the linear calculation results are available
-            if 'node_displacements_linear' in self.solution and self.solution['node_displacements_linear'] is not None:
-                # Enable the plot_linear_deformation button
-                self.plot_linear_deformation.config(state='normal')
-                self.plot_linear_forces.config(state='normal')
-                self.export_plot.config(state='normal')
-                # Create a mapping from node tuples to their index in the global_nodes_list
-                self.node_to_index = {node: index for index, node in enumerate(self.solution['nodes'])}
-                # Copy linear displacements for plotting
-                self.linear_displacement = self.solution['node_displacements_linear']
-                print('The axial forces of the linear elastic calculation are:')
-                print(self.solution['axial_forces_linear'])
-                print('The global forces equilibrium (linear support reaction forces) are:')
-                print(self.solution['node_equilibrium_linear'])
-            else:
-                # Disable the button if linear results are not available
+        try:
+            # Check Input parameters for errors:
+            ele_quad_coeff = []
+            for ele_id, ele_values in self.input_elements.items():
+                ele_quad_coeff.append(abs(ele_values['ele_quad_coeff']))
+            if (self.input_calc_param['calc_method'] in 'NR' or self.input_calc_param[
+                'calc_method'] in 'modNR') and sum(
+                    ele_quad_coeff) == 0:
+                messagebox.showwarning("Warning", f"You selected a nonlinear Newton-Raphson calculation, "
+                                                  f"but you set the nonlinear parameter β of all elements to 0! "
+                                                  f"Calculating linear...")
+                self.input_calc_param['calc_method'] = 'linear'
+                self.method_combobox.current(0)
+            # Run Calculation
+            calculation = Calculation(self.input_elements, self.input_supports, self.input_forces,
+                                      self.input_calc_param)
+            self.solution = calculation.return_solution()
+            if self.solution is not None and self.solution['error_linalg'] is None:
+                # Check if the linear calculation results are available
+                if 'node_displacements_linear' in self.solution and self.solution[
+                    'node_displacements_linear'] is not None:
+                    # Enable the plot_linear_deformation button
+                    self.plot_linear_deformation.config(state='normal')
+                    self.plot_linear_forces.config(state='normal')
+                    self.export_plot.config(state='normal')
+                    # Create a mapping from node tuples to their index in the global_nodes_list
+                    self.node_to_index = {node: index for index, node in enumerate(self.solution['nodes'])}
+                    # Copy linear displacements for plotting
+                    self.linear_displacement = self.solution['node_displacements_linear']
+                    print('The axial forces of the linear elastic calculation are:')
+                    print(self.solution['axial_forces_linear'])
+                    print('The global forces equilibrium (linear support reaction forces) are:')
+                    print(self.solution['node_equilibrium_linear'])
+                else:
+                    # Disable the button if linear results are not available
+                    self.plot_linear_deformation.config(state='disabled')
+                if 'NR' in self.input_calc_param['calc_method'] or 'modNR' in self.input_calc_param['calc_method']:
+                    self.plot_nonlinear_deformation.config(state='normal')
+                    self.plot_nonlinear_forces.config(state='normal')
+                    # Copy linear displacements for plotting
+                    self.nonlinear_displacement = self.solution['node_displacements_nonlinear']
+                    print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')
+                    print(self.solution['axial_forces_nonlinear'])
+                    print('The global forces equilibrium (nonlinear support reaction forces) are:')
+                    print(self.solution['node_equilibrium_nonlinear'])
+
+                self.update_calculation_information()
+
+            elif self.solution is not None and self.solution['error_linalg'] is not None:
+                # Handle error in calculation
+                messagebox.showerror("Error", f"An error occurred while solving the system of equations: "
+                                              f"{self.solution['error_linalg']}. Please check if your system is statically "
+                                              f"determined and that all truss elements are connected.")
+                # Ensure the button remains disabled if the calculation failed
                 self.plot_linear_deformation.config(state='disabled')
-            if 'NR' in self.input_calc_param['calc_method'] or 'modNR' in self.input_calc_param['calc_method']:
-                self.plot_nonlinear_deformation.config(state='normal')
-                self.plot_nonlinear_forces.config(state='normal')
-                # Copy linear displacements for plotting
-                self.nonlinear_displacement = self.solution['node_displacements_nonlinear']
-                print('The axial forces of the nonlinear elastic / ideal plastic calculation are:')
-                print(self.solution['axial_forces_nonlinear'])
-                print('The global forces equilibrium (nonlinear support reaction forces) are:')
-                print(self.solution['node_equilibrium_nonlinear'])
-
-            self.update_calculation_information()
-
-        elif self.solution is not None and self.solution['error_linalg'] is not None:
-            # Handle error in calculation
-            messagebox.showerror("Error", f"An error occurred while solving the system of equations: "
-                                          f"{self.solution['error_linalg']}. Please check if your system is statically "
-                                          f"determined and that all truss elements are connected.")
-            # Ensure the button remains disabled if the calculation failed
-            self.plot_linear_deformation.config(state='disabled')
+        except Exception as e:
+            # Show a warning message box
+            messagebox.showerror("Error", f"An error occurred while running the calculation: {e}")
+            return
 
     def clear_all(self):
         self.canvas.delete("all")  # Clear the canvas
@@ -1901,6 +2212,8 @@ class TrussAnalysisApp(tk.Tk):
         self.ele_number = 0
         self.force_number = 0
         self.support_number = 0
+        self.edit_cx = 0
+        self.edit_cy = 0
         self.max_force = 1
         self.nodes = []
         self.solution = None
