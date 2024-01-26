@@ -519,16 +519,75 @@ class TrussAnalysisApp(tk.Tk):
 
     def display_tutorial(self):
         # Create a top-level window
-        info_window = tk.Toplevel(self)
-        set_icon(info_window)
-        info_window.geometry('400x200')
-        info_window.resizable(False, False)
-        center_window(info_window, 400, 200)
-        info_window.title("Tutorial")
+        tutorial_window = tk.Toplevel(self)
+        set_icon(tutorial_window)
+        tutorial_window.geometry('600x300')
+        tutorial_window.resizable(False, False)
+        center_window(tutorial_window, 600, 300)
+        tutorial_window.title("Tutorial")
 
-        # Display the information
-        tutorial_text = "TUTORIAL - Work in progress :("
-        tk.Label(info_window, text=tutorial_text, justify=tk.LEFT).pack(padx=10, pady=10)
+        # Create a Text widget
+        tutorial_text_widget = tk.Text(tutorial_window, wrap='word', height=15, width=70)
+        tutorial_text_widget.pack(padx=10, pady=10)
+
+        # Define tags for different font styles and sizes
+        tutorial_text_widget.tag_configure('header1', font=('Helvetica', 14, 'bold'), justify="center")
+        tutorial_text_widget.tag_configure('header2', font=('Helvetica', 12, 'bold'))
+        tutorial_text_widget.tag_configure('text', font=('Helvetica', 12))
+
+        # Insert the information text
+        tutorial_header1 = "Tutorial TrussFEM\n\n"
+        # tutorial_header2 = "General Information\n"
+        tutorial_text1 = ("TrussFEM is a FEM-Software to calculate the axial forces and displacements of linear and "
+                          "nonlinear 2D truss structures. The nonlinear material model has the following quadratic "
+                          "stress-strain-relationship:\n\n")
+        tutorial_equation1 = ("σ(ε) = (α ∙ ε ± β ∙ ε²) ∙ E_0 for |ε| ≤ ε_y\n"
+                              "σ(ε) = σ_y for |ε| ≥ ε_y\n\n"
+                              "where\n"
+                              "σ       – Axial stress (N/mm²)\n"
+                              "σ_y   – Limit axial stress (yield stress) (N/mm²)\n"
+                              "ε        – Axial strain [ - ]\n"
+                              "ε_y    – Limit axial strain (yield strain) [ - ]\n"
+                              "α       – Linear coefficient\n"
+                              "β       – Quadratic coefficient\n"
+                              "E_0  – Young’s modulus (initial tangent stiffness)\n\n")
+        tutorial_text2 = ("This stress-strain relationship is the same for compressive and tensile stresses and is "
+                          "illustrated in the figure below. Due this circumstance, the input parameters ε_y, α and β "
+                          "are not sign sensitive.\n\n")
+        # Include image of stress-strain-relationship
+        image_data = base64.b64decode(GUI_Settings.return_stress_strain_base64())
+        stress_strain_photo = Image.open(BytesIO(image_data))
+        stress_strain_photo = ImageTk.PhotoImage(stress_strain_photo)
+        # Further explanation
+        tutorial_text3 = ("Due to the non-linear material behavior, a linear calculation results in an imbalance in "
+                          "the nodal forces. In order to determine the nodal forces for the equilibrium state, a "
+                          "nonlinear problem must be solved. The nonlinear problem is solved by the classical "
+                          "Newton-Raphson- or the modified Newton-Raphson-Method. In both methods, the calculation is "
+                          "carried out iteratively, with the calculation running until either a termination criterion "
+                          "(ΔF_max) for the maximal nodal force imbalance is met or the specified maximum number of "
+                          "iterations is reached. During the calculation, the axial forces are updated in each step "
+                          "based on the stress-strain relationship. The classic Newton-Raphson method also updates "
+                          "the Young's modulus for each element. This method therefore exhibits quadratic "
+                          "convergence. In the modified method, the Young's moduli are not updated, which reduces "
+                          "the effort in each calculation step, but the procedure only converges linearly and "
+                          "generally requires more iterations to reach the equilibrium state.\n\n")
+
+        # Add text and apply tags
+        tutorial_text_widget.insert('end', tutorial_header1, 'header1')
+        # tutorial_text_widget.insert('end', tutorial_header2, 'header2')
+        tutorial_text_widget.insert('end', tutorial_text1, 'text')
+        tutorial_text_widget.insert('end', tutorial_equation1, 'text')
+        tutorial_text_widget.insert('end', tutorial_text2, 'text')
+        # Insert the image into the Text widget
+        tutorial_text_widget.image_create('end', image=stress_strain_photo)
+        # Add text and apply tags
+        tutorial_text_widget.insert('end', tutorial_text3, 'text')
+
+        # Keep a reference to the image to prevent garbage collection
+        tutorial_text_widget.image = stress_strain_photo
+
+        # Make the text read-only (optional)
+        tutorial_text_widget.configure(state='disabled')
 
     def export_canvas(self):
         # Get canvas bounds
@@ -2145,7 +2204,7 @@ class TrussAnalysisApp(tk.Tk):
                 ele_quad_coeff.append(abs(ele_values['ele_quad_coeff']))
             if (self.input_calc_param['calc_method'] in 'NR' or self.input_calc_param[
                 'calc_method'] in 'modNR') and sum(
-                    ele_quad_coeff) == 0:
+                ele_quad_coeff) == 0:
                 messagebox.showwarning("Warning", f"You selected a nonlinear Newton-Raphson calculation, "
                                                   f"but you set the nonlinear parameter β of all elements to 0! "
                                                   f"Calculating linear...")
