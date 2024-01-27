@@ -42,7 +42,7 @@ AUTHOR = 'Marius Mellmann, Elias Perras'
 VERSION_MAJOR = 1
 VERSION_MINOR = 0
 VERSION_PATCH = 0
-RELEASE_DATE = '06.01.2024'
+RELEASE_DATE = '27.01.2024'
 CONTACT = 'info@pum-consulting.de'
 
 
@@ -1063,9 +1063,7 @@ class TrussAnalysisApp(tk.Tk):
         max_w_index = max(range(len(displacement)), key=lambda i: abs(displacement[i][1]))
         max_displacement_u = displacement[max_u_index][0] * 1000
         max_displacement_w = displacement[max_w_index][1] * 1000
-        # deformation_scale = max_dimension * 0.1 / max_displacement
         deformation_scale = 0.4 / max_displacement
-        # hinge_radius = 0.006 * max_dimension * scale
         hinge_radius = 7
 
         # Displaying the text on the canvas
@@ -1138,7 +1136,6 @@ class TrussAnalysisApp(tk.Tk):
         # Scaling and normalization
         max_abs_force = max(abs(np.array(axial_forces)))
         scale, translate_x, translate_y, max_dimension = self.calculate_bounds_and_scale()
-        # force_scale = max_dimension * 0.14
         force_scale = 0.6
         axial_forces_norm = axial_forces / max_abs_force
 
@@ -2010,7 +2007,6 @@ class TrussAnalysisApp(tk.Tk):
             force_id = list(self.input_forces.keys())[selected_index]
             # Parse the coordinates from the entry fields
             force_node = self.get_selected_node(self.edit_force_node_entry)
-            # force_node = self.parse_coordinates(self.edit_force_node_entry.get())
             if self.edit_force_x_entry.get():
                 f_x = float(self.edit_force_x_entry.get())
             else:
@@ -2433,7 +2429,7 @@ class TrussAnalysisApp(tk.Tk):
             if self.solution is not None and self.solution['error_linalg'] is None:
                 # Check if the linear calculation results are available
                 if 'node_displacements_linear' in self.solution and self.solution[
-                    'node_displacements_linear'] is not None:
+                   'node_displacements_linear'] is not None:
                     # Enable the plot_linear_deformation button
                     self.plot_linear_deformation.config(state='normal')
                     self.plot_linear_forces.config(state='normal')
