@@ -180,6 +180,7 @@ class TrussAnalysisApp(tk.Tk):
         # Main frame for forms
         main_frame = ttk.Frame(self)
         main_frame.pack(side="left", fill='y', padx=20, pady=20)
+        main_frame.pack(side="left", fill='y', padx=20, pady=20)
 
         # Canvas frame for plotting
         canvas_frame = ttk.Frame(self)
@@ -1263,7 +1264,8 @@ class TrussAnalysisApp(tk.Tk):
 
         # Create Entry boxes and labels for element input parameters
         ttk.Label(frame, text="Support Node (x, y) [m]:").grid(row=0, column=0, sticky='w')
-        self.support_node_entry = ttk.Entry(frame)
+        # self.support_node_entry = ttk.Entry(frame)
+        self.support_node_entry = ttk.Combobox(frame, state="readonly")
         self.support_node_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Label(frame, text="Rigid in x-direction:").grid(row=1, column=0, sticky='w')
@@ -1326,7 +1328,8 @@ class TrussAnalysisApp(tk.Tk):
 
         # Create Entry boxes and labels for element input parameters
         ttk.Label(frame, text="Force Node (x, y) [m]:").grid(row=0, column=0, sticky='w')
-        self.force_node_entry = ttk.Entry(frame)
+        # self.force_node_entry = ttk.Entry(frame)
+        self.force_node_entry = ttk.Combobox(frame, state="readonly")
         self.force_node_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Label(frame, text="Force F_x [kN]:").grid(row=1, column=0, sticky='w')
@@ -1375,6 +1378,29 @@ class TrussAnalysisApp(tk.Tk):
         self.delta_f_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Button(frame, text="Save Settings", command=self.calc_settings).grid(row=3, columnspan=2, pady=7)
+
+    def update_node_comboboxes(self):
+        self.node_label_to_value_map = {}
+        for element in self.input_elements.values():
+            # Check and add nodes to the list if they are not already in it
+            if element['ele_node_i'] not in self.nodes:
+                self.nodes.append(element['ele_node_i'])
+            if element['ele_node_j'] not in self.nodes:
+                self.nodes.append(element['ele_node_j'])
+        for idx, node in enumerate(self.nodes):
+            label = f"N{idx}: ({node[0]}, {node[1]})"
+            self.node_label_to_value_map[label] = node
+
+        self.support_node_entry['values'] = list(self.node_label_to_value_map.keys())
+        self.force_node_entry['values'] = list(self.node_label_to_value_map.keys())
+
+        if self.node_label_to_value_map:
+            self.support_node_entry.current(0)
+            self.force_node_entry.current(0)
+
+    def get_selected_node(self, combobox):
+        label = combobox.get()
+        return self.node_label_to_value_map.get(label, None)  # Returns None if label not found
 
     def add_element(self):
         try:
@@ -1481,6 +1507,7 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.update_node_comboboxes()
 
         except Exception as e:
             # Show a warning message box
@@ -1654,6 +1681,7 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.update_node_comboboxes()
             # Close window
             self.edit_window.destroy()
         except Exception as e:
@@ -1698,13 +1726,14 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_support('black', None)
         self.toggle_loads()
         self.toggle_node_labels()
+        self.update_node_comboboxes()
         # Update the combobox options and entry fields
         self.update_element_dropdown()
 
     def add_load(self):
         try:
             # Parse the coordinates from the entry fields
-            force_node = self.parse_coordinates(self.force_node_entry.get())
+            force_node = self.get_selected_node(self.force_node_entry)
 
             # Do not proceed further if the coordinates are invalid
             if force_node is None:
@@ -1890,7 +1919,7 @@ class TrussAnalysisApp(tk.Tk):
     def add_support(self):
         try:
             # Parse the coordinates from the entry fields
-            support_node = self.parse_coordinates(self.support_node_entry.get())
+            support_node = self.get_selected_node(self.support_node_entry)
             # Do not proceed further if the coordinates are invalid
             if support_node is None:
                 return
@@ -2294,6 +2323,7 @@ class TrussAnalysisApp(tk.Tk):
         # Update information window
         self.update_calculation_information()
         self.toggle_grid()
+        self.update_node_comboboxes()
 
     def save_to_file(self):
         data = {
@@ -2366,6 +2396,7 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.update_node_comboboxes()
 
     def plot_system(self):
         # Clear existing canvas
