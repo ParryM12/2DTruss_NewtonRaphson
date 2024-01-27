@@ -183,6 +183,7 @@ class TrussAnalysisApp(tk.Tk):
         main_frame.pack(side="left", fill='y', padx=20, pady=20)
 
         # Canvas frame for plotting
+        # Canvas frame for plotting
         canvas_frame = ttk.Frame(self)
         canvas_frame.pack(side="left", fill="both", expand=True)
 
@@ -621,14 +622,8 @@ class TrussAnalysisApp(tk.Tk):
         if self.input_supports and self.add_support_initialise == 1:
             info_text += "\nSupports:\n"
             for sup in self.input_supports.values():
-                if sup['c_x'] != 1:
-                    c_x = sup['c_x']
-                else:
-                    c_x = '∞'
-                if sup['c_y'] != 1:
-                    c_y = sup['c_y']
-                else:
-                    c_y = '∞'
+                c_x = sup['c_x']
+                c_y = sup['c_y']
                 info_text += (f"Support {sup['sup_number']}: Node = {sup['sup_node']}, c_x = {c_x} kN/m, "
                               f"c_y = {c_y} kN/m.\n")
 
@@ -1217,41 +1212,74 @@ class TrussAnalysisApp(tk.Tk):
         frame.columnconfigure(0, minsize=GUI_Settings.FRAME_WIDTH_COL1)
         frame.columnconfigure(1, minsize=GUI_Settings.FRAME_WIDTH_COL2)
 
+        # Checkbutton to select linear/nonlinear element
+        ttk.Label(frame, text="Nonlinear element:").grid(row=0, column=0, sticky='w')
+        self.element_type_state = tk.BooleanVar(value=False)
+        self.element_type = ttk.Checkbutton(frame, variable=self.element_type_state,
+                                            command=self.toggle_element_type)
+        self.element_type.grid(row=0, column=1, sticky='w', padx=5)
+
         # Create Entry boxes and labels for element input parameters
-        ttk.Label(frame, text="Node i (x, y) [m]:").grid(row=0, column=0, sticky='w')
+        ttk.Label(frame, text="Node i (x, y) [m]:").grid(row=1, column=0, sticky='w')
         self.node_i_entry = ttk.Entry(frame)
-        self.node_i_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=1)
+        self.node_i_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=1)
 
-        ttk.Label(frame, text="Node j (x, y) [m]:").grid(row=1, column=0, sticky='w')
+        ttk.Label(frame, text="Node j (x, y) [m]:").grid(row=2, column=0, sticky='w')
         self.node_j_entry = ttk.Entry(frame)
-        self.node_j_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=0)
+        self.node_j_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=0)
 
-        ttk.Label(frame, text="Cross-section area A [cm²]:").grid(row=2, column=0, sticky='w')
+        ttk.Label(frame, text="Cross-section area A [cm²]:").grid(row=3, column=0, sticky='w')
         self.area_entry = ttk.Entry(frame)
-        self.area_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
+        self.area_entry.grid(row=3, column=1, sticky='ew', padx=5, pady=1)
 
-        ttk.Label(frame, text="Young's modulus E [MPa]:").grid(row=3, column=0, sticky='w')
+        ttk.Label(frame, text="Young's modulus E [MPa]:").grid(row=4, column=0, sticky='w')
         self.emod_entry = ttk.Entry(frame)
-        self.emod_entry.grid(row=3, column=1, sticky='ew', padx=5, pady=0)
+        self.emod_entry.grid(row=4, column=1, sticky='ew', padx=5, pady=0)
 
-        ttk.Label(frame, text="Linear coefficient α [-]:").grid(row=4, column=0, sticky='w')
+        ttk.Label(frame, text="Linear coefficient α [-]:").grid(row=5, column=0, sticky='w')
         self.lin_coeff_entry = ttk.Entry(frame)
-        self.lin_coeff_entry.grid(row=4, column=1, sticky='ew', padx=5, pady=1)
+        self.lin_coeff_entry.grid(row=5, column=1, sticky='ew', padx=5, pady=1)
 
-        ttk.Label(frame, text="Quadratic coefficient β [-]:").grid(row=5, column=0, sticky='w')
+        ttk.Label(frame, text="Quadratic coefficient β [-]:").grid(row=6, column=0, sticky='w')
         self.quad_coeff_entry = ttk.Entry(frame)
-        self.quad_coeff_entry.grid(row=5, column=1, sticky='ew', padx=5, pady=0)
+        self.quad_coeff_entry.grid(row=6, column=1, sticky='ew', padx=5, pady=0)
 
-        ttk.Label(frame, text="Limit strain ε [-]:").grid(row=6, column=0, sticky='w')
+        ttk.Label(frame, text="Limit strain ε_y [-]:").grid(row=7, column=0, sticky='w')
         self.strain_entry = ttk.Entry(frame)
-        self.strain_entry.grid(row=6, column=1, sticky='ew', padx=5, pady=1)
+        self.strain_entry.grid(row=7, column=1, sticky='ew', padx=5, pady=1)
 
         # Create Button to edit an element
-        ttk.Button(frame, text="Edit/Delete Element", command=self.edit_element).grid(row=7, column=0, pady=7, padx=17,
-                                                                                      sticky='ew')
+        self.edit_element_button = ttk.Button(frame, text="Edit/Delete Element", command=self.edit_element,
+                                              state='disabled')
+        self.edit_element_button.grid(row=8, column=0, pady=7, padx=17, sticky='ew')
         # Create Button to add the element
-        ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=7, column=1, pady=7, padx=10,
+        ttk.Button(frame, text="Add Element", command=self.add_element).grid(row=8, column=1, pady=7, padx=10,
                                                                              sticky='ew')
+
+        # Toggle element type
+        self.toggle_element_type()
+
+    def toggle_element_type(self):
+        if self.element_type_state.get():
+            self.lin_coeff_entry.configure(state='normal')
+            self.lin_coeff_entry.delete(0, tk.END)
+            self.lin_coeff_entry.insert(0, '1')
+            self.quad_coeff_entry.configure(state='normal')
+            self.quad_coeff_entry.delete(0, tk.END)
+            self.quad_coeff_entry.insert(0, '300')
+            self.strain_entry.configure(state='normal')
+            self.strain_entry.delete(0, tk.END)
+            self.strain_entry.insert(0, '0.0025')
+        else:
+            self.lin_coeff_entry.delete(0, tk.END)
+            self.lin_coeff_entry.insert(0, '1')
+            self.lin_coeff_entry.configure(state='readonly')
+            self.quad_coeff_entry.delete(0, tk.END)
+            self.quad_coeff_entry.insert(0, '0')
+            self.quad_coeff_entry.configure(state='readonly')
+            self.strain_entry.delete(0, tk.END)
+            self.strain_entry.insert(0, '0')
+            self.strain_entry.configure(state='readonly')
 
     def add_supports_form(self, parent_frame):
         # Create Frame
@@ -1291,8 +1319,10 @@ class TrussAnalysisApp(tk.Tk):
         self.toggle_stiffness_cy()
 
         # Create Button to edit a support
-        ttk.Button(frame, text="Edit/Delete Support", command=self.edit_support).grid(row=5, column=0, pady=7, padx=17,
-                                                                                      sticky='ew')
+        self.edit_support_button = ttk.Button(frame, text="Edit/Delete Support", command=self.edit_support,
+                                              state='disabled')
+        self.edit_support_button.grid(row=5, column=0, pady=7, padx=17, sticky='ew')
+
         # Create Button to add the support
         ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=5, column=1, pady=7, padx=10,
                                                                              sticky='ew')
@@ -1342,8 +1372,8 @@ class TrussAnalysisApp(tk.Tk):
         self.force_y_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
 
         # Create Button to edit a load
-        ttk.Button(frame, text="Edit/Delete Load", command=self.edit_load).grid(row=3, column=0, pady=7, padx=17,
-                                                                                sticky='ew')
+        self.edit_load_button = ttk.Button(frame, text="Edit/Delete Load", command=self.edit_load, state='disabled')
+        self.edit_load_button.grid(row=3, column=0, pady=7, padx=17, sticky='ew')
         # Create Button to add the load
         ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, column=1, pady=7, padx=10,
                                                                        sticky='ew')
@@ -1381,6 +1411,7 @@ class TrussAnalysisApp(tk.Tk):
 
     def update_node_comboboxes(self):
         self.node_label_to_value_map = {}
+        self.node_value_to_index_map = {}
         for element in self.input_elements.values():
             # Check and add nodes to the list if they are not already in it
             if element['ele_node_i'] not in self.nodes:
@@ -1390,6 +1421,7 @@ class TrussAnalysisApp(tk.Tk):
         for idx, node in enumerate(self.nodes):
             label = f"N{idx}: ({node[0]}, {node[1]})"
             self.node_label_to_value_map[label] = node
+            self.node_value_to_index_map[f'{node}'] = idx
 
         self.support_node_entry['values'] = list(self.node_label_to_value_map.keys())
         self.force_node_entry['values'] = list(self.node_label_to_value_map.keys())
@@ -1501,6 +1533,7 @@ class TrussAnalysisApp(tk.Tk):
             self.canvas.delete("all")  # Clear the canvas
             self.plot_button.config(state='normal')
             # Create grid, if selected
+            self.edit_element_button.config(state='normal')
             self.toggle_grid()
             self.draw_coordinate_system()
             self.draw_element()
@@ -1519,6 +1552,7 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_window = tk.Toplevel(self)
         set_icon(self.edit_window)
         self.edit_window.title("Edit Element")
+        center_window(self.edit_window, 350, 290)
 
         # Frame for entry boxes and labels
         edit_frame = ttk.Frame(self.edit_window)
@@ -1532,40 +1566,47 @@ class TrussAnalysisApp(tk.Tk):
         self.element_dropdown.grid(row=0, column=1, sticky='ew', padx=5, pady=10)
         self.element_dropdown.bind("<<ComboboxSelected>>", self.populate_element_fields)
 
+        # Checkbutton to select linear/nonlinear element
+        ttk.Label(edit_frame, text="Nonlinear element:").grid(row=1, column=0, sticky='w')
+        self.edit_element_type_state = tk.BooleanVar(value=False)
+        self.edit_element_type = ttk.Checkbutton(edit_frame, variable=self.edit_element_type_state,
+                                                 command=self.toggle_edit_element_type)
+        self.edit_element_type.grid(row=1, column=1, sticky='w', padx=5)
+
         # Creating labeled entry boxes
-        ttk.Label(edit_frame, text="Node i (x, y) [m]:").grid(row=1, column=0, sticky='w')
+        ttk.Label(edit_frame, text="Node i (x, y) [m]:").grid(row=2, column=0, sticky='w')
         self.edit_node_i_entry = ttk.Entry(edit_frame)
-        self.edit_node_i_entry.grid(row=1, column=1, sticky='ew', padx=5)
+        self.edit_node_i_entry.grid(row=2, column=1, sticky='ew', padx=5)
 
-        ttk.Label(edit_frame, text="Node j (x, y) [m]:").grid(row=2, column=0, sticky='w')
+        ttk.Label(edit_frame, text="Node j (x, y) [m]:").grid(row=3, column=0, sticky='w')
         self.edit_node_j_entry = ttk.Entry(edit_frame)
-        self.edit_node_j_entry.grid(row=2, column=1, sticky='ew', padx=5)
+        self.edit_node_j_entry.grid(row=3, column=1, sticky='ew', padx=5, pady=1)
 
-        ttk.Label(edit_frame, text="Cross-section area A [cm²]:").grid(row=3, column=0, sticky='w')
+        ttk.Label(edit_frame, text="Cross-section area A [cm²]:").grid(row=4, column=0, sticky='w')
         self.edit_area_entry = ttk.Entry(edit_frame)
-        self.edit_area_entry.grid(row=3, column=1, sticky='ew', padx=5)
+        self.edit_area_entry.grid(row=4, column=1, sticky='ew', padx=5)
 
-        ttk.Label(edit_frame, text="Young's modulus E [MPa]:").grid(row=4, column=0, sticky='w')
+        ttk.Label(edit_frame, text="Young's modulus E [MPa]:").grid(row=5, column=0, sticky='w')
         self.edit_emod_entry = ttk.Entry(edit_frame)
-        self.edit_emod_entry.grid(row=4, column=1, sticky='ew', padx=5)
+        self.edit_emod_entry.grid(row=5, column=1, sticky='ew', padx=5, pady=1)
 
-        ttk.Label(edit_frame, text="Linear coefficient α [-]:").grid(row=5, column=0, sticky='w')
+        ttk.Label(edit_frame, text="Linear coefficient α [-]:").grid(row=6, column=0, sticky='w')
         self.edit_lin_coeff_entry = ttk.Entry(edit_frame)
-        self.edit_lin_coeff_entry.grid(row=5, column=1, sticky='ew', padx=5)
+        self.edit_lin_coeff_entry.grid(row=6, column=1, sticky='ew', padx=5)
 
-        ttk.Label(edit_frame, text="Quadratic coefficient β [-]:").grid(row=6, column=0, sticky='w')
+        ttk.Label(edit_frame, text="Quadratic coefficient β [-]:").grid(row=7, column=0, sticky='w')
         self.edit_quad_coeff_entry = ttk.Entry(edit_frame)
-        self.edit_quad_coeff_entry.grid(row=6, column=1, sticky='ew', padx=5)
+        self.edit_quad_coeff_entry.grid(row=7, column=1, sticky='ew', padx=5, pady=1)
 
-        ttk.Label(edit_frame, text="Limit strain ε [-]:").grid(row=7, column=0, sticky='w')
+        ttk.Label(edit_frame, text="Limit strain ε_y [-]:").grid(row=8, column=0, sticky='w')
         self.edit_strain_entry = ttk.Entry(edit_frame)
-        self.edit_strain_entry.grid(row=7, column=1, sticky='ew', padx=5)
+        self.edit_strain_entry.grid(row=8, column=1, sticky='ew', padx=5)
 
         # Button for saving changes
-        ttk.Button(edit_frame, text="Save Changes", command=self.save_element_changes).grid(row=8, column=1, padx=5,
+        ttk.Button(edit_frame, text="Save Changes", command=self.save_element_changes).grid(row=9, column=1, padx=5,
                                                                                             pady=10)
         # Button for deleting the selected element
-        ttk.Button(edit_frame, text="Delete Element", command=self.delete_element).grid(row=8, column=0, padx=5)
+        ttk.Button(edit_frame, text="Delete Element", command=self.delete_element).grid(row=9, column=0, padx=5)
 
         # Initially populate the entry boxes with the current values of the first element
         self.populate_element_fields()
@@ -1573,31 +1614,93 @@ class TrussAnalysisApp(tk.Tk):
         # Call update_element_dropdown to initialize the combobox values
         self.update_element_dropdown()
 
+        # Toggle element type
+        self.toggle_edit_element_type()
+
+    def toggle_edit_element_type(self):
+        if self.edit_element_type_state.get():
+            self.edit_lin_coeff_entry.configure(state='normal')
+            self.edit_lin_coeff_entry.delete(0, tk.END)
+            if self.lin_coeff == 1:
+                self.edit_lin_coeff_entry.insert(0, '1')
+            else:
+                self.edit_lin_coeff_entry.insert(0, self.lin_coeff)
+            self.edit_quad_coeff_entry.configure(state='normal')
+            self.edit_quad_coeff_entry.delete(0, tk.END)
+            if self.quad_coeff == 0:
+                self.edit_quad_coeff_entry.insert(0, '300')
+            else:
+                self.edit_quad_coeff_entry.insert(0, self.quad_coeff)
+            self.edit_strain_entry.configure(state='normal')
+            self.edit_strain_entry.delete(0, tk.END)
+            if self.eps_f == 0:
+                self.edit_strain_entry.insert(0, '0.0025')
+            else:
+                self.edit_strain_entry.insert(0, self.eps_f)
+        else:
+            self.edit_lin_coeff_entry.delete(0, tk.END)
+            self.edit_lin_coeff_entry.insert(0, '1')
+            self.edit_lin_coeff_entry.configure(state='readonly')
+            self.edit_quad_coeff_entry.delete(0, tk.END)
+            self.edit_quad_coeff_entry.insert(0, '0')
+            self.edit_quad_coeff_entry.configure(state='readonly')
+            self.edit_strain_entry.delete(0, tk.END)
+            self.edit_strain_entry.insert(0, '0')
+            self.edit_strain_entry.configure(state='readonly')
+
     def populate_element_fields(self, event=None):
         selected_index = self.element_dropdown.current()
-        element_id = list(self.input_elements.keys())[selected_index]
-        element = self.input_elements[element_id]
-
-        self.edit_node_i_entry.delete(0, tk.END)
-        self.edit_node_i_entry.insert(0, f"{element['ele_node_i'][0]}, {element['ele_node_i'][1]}")
-
-        self.edit_node_j_entry.delete(0, tk.END)
-        self.edit_node_j_entry.insert(0, f"{element['ele_node_j'][0]}, {element['ele_node_j'][1]}")
+        if selected_index != -1:
+            element_id = list(self.input_elements.keys())[selected_index]
+            element = self.input_elements[element_id]
+            node_i_x = element['ele_node_i'][0]
+            node_i_y = element['ele_node_i'][1]
+            node_j_x = element['ele_node_j'][0]
+            node_j_y = element['ele_node_j'][1]
+            area = element['ele_A']
+            emod = element['ele_E']
+            self.lin_coeff = element['ele_lin_coeff']
+            self.quad_coeff = element['ele_quad_coeff']
+            self.eps_f = element['ele_eps_f']
+            if self.quad_coeff == 0:
+                self.edit_element_type_state.set(False)
+            else:
+                self.edit_element_type_state.set(True)
+            self.edit_node_i_entry.delete(0, tk.END)
+            self.edit_node_i_entry.insert(0, f"{node_i_x}, {node_i_y}")
+            self.edit_node_j_entry.delete(0, tk.END)
+            self.edit_node_j_entry.insert(0, f"{node_j_x}, {node_j_y}")
+        else:
+            node_i_x = " "
+            node_i_y = " "
+            node_j_x = " "
+            node_j_y = " "
+            area = " "
+            emod = " "
+            self.lin_coeff = " "
+            self.quad_coeff = " "
+            self.eps_f = " "
+            self.edit_node_i_entry.delete(0, tk.END)
+            self.edit_node_i_entry.insert(0, f"{node_i_x} {node_i_y}")
+            self.edit_node_j_entry.delete(0, tk.END)
+            self.edit_node_j_entry.insert(0, f"{node_j_x} {node_j_y}")
 
         self.edit_area_entry.delete(0, tk.END)
-        self.edit_area_entry.insert(0, f"{element['ele_A']}")
+        self.edit_area_entry.insert(0, f"{area}")
 
         self.edit_emod_entry.delete(0, tk.END)
-        self.edit_emod_entry.insert(0, f"{element['ele_E']}")
+        self.edit_emod_entry.insert(0, f"{emod}")
 
         self.edit_lin_coeff_entry.delete(0, tk.END)
-        self.edit_lin_coeff_entry.insert(0, f"{element['ele_lin_coeff']}")
+        self.edit_lin_coeff_entry.insert(0, f"{self.lin_coeff}")
 
         self.edit_quad_coeff_entry.delete(0, tk.END)
-        self.edit_quad_coeff_entry.insert(0, f"{element['ele_quad_coeff']}")
+        self.edit_quad_coeff_entry.insert(0, f"{self.quad_coeff}")
 
         self.edit_strain_entry.delete(0, tk.END)
-        self.edit_strain_entry.insert(0, f"{element['ele_eps_f']}")
+        self.edit_strain_entry.insert(0, f"{self.eps_f}")
+
+        self.toggle_edit_element_type()
 
     def save_element_changes(self):
         try:
@@ -1715,11 +1818,57 @@ class TrussAnalysisApp(tk.Tk):
             new_input_elements[str(i)] = self.input_elements[key]
             new_input_elements[str(i)]['ele_number'] = i
         self.input_elements = new_input_elements
+        if self.input_elements == {}:
+            self.add_element_initialise = 0
+            self.edit_element_button.config(state='disabled')
+        # Check if loads or supports are located at the deleted nodes
+        # Update global nodes
+        self.nodes = []
+        for element in self.input_elements.values():
+            # Check and add nodes to the list if they are not already in it
+            if element['ele_node_i'] not in self.nodes:
+                self.nodes.append(element['ele_node_i'])
+            if element['ele_node_j'] not in self.nodes:
+                self.nodes.append(element['ele_node_j'])
+        # Check Supports
+        input_supports = copy.deepcopy(self.input_supports)
+        for key, support in self.input_supports.items():
+            if support['sup_node'] not in self.nodes:
+                del input_supports[key]
+        self.input_supports = copy.deepcopy(input_supports)
+        # Renumbering the remaining supports
+        new_input_supports = {}
+        for i, key in enumerate(sorted(self.input_supports.keys())):
+            new_input_supports[str(i)] = self.input_supports[key]
+            new_input_supports[str(i)]['sup_number'] = i
+        self.input_supports = new_input_supports
+        # Disable edit button if no supports are defined
+        if self.input_supports == {}:
+            self.add_support_initialise = 0
+            self.edit_support_button.config(state='disabled')
+        # Check Loads
+        input_forces = copy.deepcopy(self.input_forces)
+        for key, force in self.input_forces.items():
+            if force['force_node'] not in self.nodes:
+                del input_forces[key]
+        self.input_forces = copy.deepcopy(input_forces)
+        # Renumbering the remaining Loads
+        new_input_forces = {}
+        for i, key in enumerate(sorted(self.input_forces.keys())):
+            new_input_forces[str(i)] = self.input_forces[key]
+            new_input_forces[str(i)]['force_number'] = i
+        self.input_forces = new_input_forces
+        # Disable edit button if no loads are defined
+        if self.input_forces == {}:
+            self.add_load_initialise = 0
+            self.edit_load_button.config(state='disabled')
+
         # Update information window
         self.update_system_information()
         # Draw elements, supports and loads on canvas
         self.canvas.delete("all")  # Clear the canvas
         # Create grid, if selected
+        self.nodes = []
         self.toggle_grid()
         self.draw_coordinate_system()
         self.draw_element()
@@ -1771,6 +1920,7 @@ class TrussAnalysisApp(tk.Tk):
             # Update information window
             self.update_system_information()
             # Draw elements, supports and loads on canvas
+            self.edit_load_button.config(state='normal')
             self.canvas.delete("all")  # Clear the canvas
             self.toggle_grid()
             self.draw_coordinate_system()
@@ -1787,6 +1937,7 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_window_load = tk.Toplevel(self)
         set_icon(self.edit_window_load)
         self.edit_window_load.title("Edit Load")
+        center_window(self.edit_window_load, 320, 170)
 
         # Frame for entry boxes and labels
         edit_frame = ttk.Frame(self.edit_window_load)
@@ -1802,12 +1953,16 @@ class TrussAnalysisApp(tk.Tk):
 
         # Creating labeled entry boxes
         ttk.Label(edit_frame, text="Force Node (x, y) [m]:").grid(row=1, column=0, sticky='w')
-        self.edit_force_node_entry = ttk.Entry(edit_frame)
+        # self.edit_force_node_entry = ttk.Entry(edit_frame)
+        self.edit_force_node_entry = ttk.Combobox(edit_frame, state="readonly")
         self.edit_force_node_entry.grid(row=1, column=1, sticky='ew', padx=5)
+        self.edit_force_node_entry['values'] = list(self.node_label_to_value_map.keys())
+        if self.node_label_to_value_map:
+            self.edit_force_node_entry.current(0)
 
         ttk.Label(edit_frame, text="Force F_x [kN]:").grid(row=2, column=0, sticky='w')
         self.edit_force_x_entry = ttk.Entry(edit_frame)
-        self.edit_force_x_entry.grid(row=2, column=1, sticky='ew', padx=5)
+        self.edit_force_x_entry.grid(row=2, column=1, sticky='ew', padx=5, pady=1)
 
         ttk.Label(edit_frame, text="Force F_y [kN]:").grid(row=3, column=0, sticky='w')
         self.edit_force_y_entry = ttk.Entry(edit_frame)
@@ -1819,6 +1974,9 @@ class TrussAnalysisApp(tk.Tk):
         # Button for deleting the selected load
         ttk.Button(edit_frame, text="Delete Load", command=self.delete_load).grid(row=4, column=0, padx=5)
 
+        # Update Combobox
+        self.update_node_comboboxes()
+
         # Initially populate the entry boxes with the current values of the first load
         self.populate_load_fields()
 
@@ -1827,24 +1985,32 @@ class TrussAnalysisApp(tk.Tk):
 
     def populate_load_fields(self, event=None):
         selected_index = self.load_dropdown.current()
-        force_id = list(self.input_forces.keys())[selected_index]
-        force = self.input_forces[force_id]
-
-        self.edit_force_node_entry.delete(0, tk.END)
-        self.edit_force_node_entry.insert(0, f"{force['force_node'][0]}, {force['force_node'][1]}")
+        if selected_index != -1:
+            force_id = list(self.input_forces.keys())[selected_index]
+            force = self.input_forces[force_id]
+            force_node = (force['force_node'][0], force['force_node'][1])
+            combobox_index = self.node_value_to_index_map[f'{force_node}']
+            f_x = force['f_x']
+            f_y = force['f_y']
+            self.edit_force_node_entry.current(combobox_index)
+        else:
+            self.edit_force_node_entry.current(0)
+            f_x = " "
+            f_y = " "
 
         self.edit_force_x_entry.delete(0, tk.END)
-        self.edit_force_x_entry.insert(0, f"{force['f_x']}")
+        self.edit_force_x_entry.insert(0, f"{f_x}")
 
         self.edit_force_y_entry.delete(0, tk.END)
-        self.edit_force_y_entry.insert(0, f"{force['f_y']}")
+        self.edit_force_y_entry.insert(0, f"{f_y}")
 
     def save_load_changes(self):
         try:
             selected_index = self.load_dropdown.current()
             force_id = list(self.input_forces.keys())[selected_index]
-            # Parse values from entry boxes
-            force_node = self.parse_coordinates(self.edit_force_node_entry.get())
+            # Parse the coordinates from the entry fields
+            force_node = self.get_selected_node(self.edit_force_node_entry)
+            # force_node = self.parse_coordinates(self.edit_force_node_entry.get())
             if self.edit_force_x_entry.get():
                 f_x = float(self.edit_force_x_entry.get())
             else:
@@ -1903,6 +2069,8 @@ class TrussAnalysisApp(tk.Tk):
             new_input_loads[str(i)]['force_number'] = i
 
         self.input_forces = new_input_loads
+        if self.input_forces == {}:
+            self.edit_load_button.config(state='disabled')
         # Update information window
         self.update_system_information()
         # Draw elements, supports and loads on canvas
@@ -1974,6 +2142,7 @@ class TrussAnalysisApp(tk.Tk):
             # Update information window
             self.update_system_information()
             # Draw elements, supports and loads on canvas
+            self.edit_support_button.config(state='normal')
             self.canvas.delete("all")  # Clear the canvas
             self.toggle_grid()
             self.draw_coordinate_system()
@@ -1991,6 +2160,7 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_window_support = tk.Toplevel(self)
         set_icon(self.edit_window_support)
         self.edit_window_support.title("Edit Support")
+        center_window(self.edit_window_support, 320, 210)
 
         # Frame for entry boxes and labels
         edit_frame = ttk.Frame(self.edit_window_support)
@@ -2006,8 +2176,12 @@ class TrussAnalysisApp(tk.Tk):
 
         # Creating labeled entry boxes
         ttk.Label(edit_frame, text="Support Node (x, y) [m]:").grid(row=1, column=0, sticky='w')
-        self.edit_support_node_entry = ttk.Entry(edit_frame)
+        # self.edit_support_node_entry = ttk.Entry(edit_frame)
+        self.edit_support_node_entry = ttk.Combobox(edit_frame, state="readonly")
         self.edit_support_node_entry.grid(row=1, column=1, sticky='ew', padx=5)
+        self.edit_support_node_entry['values'] = list(self.node_label_to_value_map.keys())
+        if self.node_label_to_value_map:
+            self.edit_support_node_entry.current(0)
 
         ttk.Label(edit_frame, text="Rigid in x-direction:").grid(row=2, column=0, sticky='w')
         self.edit_support_rigid_cx_state = tk.BooleanVar(value=True)
@@ -2034,6 +2208,9 @@ class TrussAnalysisApp(tk.Tk):
                                                                                             pady=10)
         # Button for deleting the selected support
         ttk.Button(edit_frame, text="Delete Support", command=self.delete_support).grid(row=6, column=0, padx=5)
+
+        # Update Combobox
+        self.update_node_comboboxes()
 
         # Initially populate the entry boxes with the current values of the first support
         self.populate_support_fields()
@@ -2063,30 +2240,38 @@ class TrussAnalysisApp(tk.Tk):
 
     def populate_support_fields(self, event=None):
         selected_index = self.support_dropdown.current()
-        support_id = list(self.input_supports.keys())[selected_index]
-        support = self.input_supports[support_id]
-        self.edit_support_node_entry.delete(0, tk.END)
-        self.edit_support_node_entry.insert(0, f"{support['sup_node'][0]}, {support['sup_node'][1]}")
+        if selected_index != -1:
+            support_id = list(self.input_supports.keys())[selected_index]
+            support = self.input_supports[support_id]
+            support_node = (support['sup_node'][0], support['sup_node'][1])
+            combobox_index = self.node_value_to_index_map[f'{support_node}']
+            c_x = support['c_x']
+            c_y = support['c_y']
+            self.edit_support_node_entry.current(combobox_index)
+        else:
+            c_x = " "
+            c_y = " "
+            self.edit_support_node_entry.current(0)
 
         self.edit_stiffness_cx_entry.delete(0, tk.END)
-        self.edit_stiffness_cx_entry.insert(0, f"{support['c_x']}")
-        if support['c_x'] == '∞':
+        self.edit_stiffness_cx_entry.insert(0, f"{c_x}")
+        if c_x == '∞':
             self.edit_stiffness_cx_entry.configure(state='readonly')
             self.edit_support_rigid_cx_state.set(True)
         else:
             self.edit_stiffness_cx_entry.configure(state='normal')
             self.edit_support_rigid_cx_state.set(False)
-            self.edit_cx = support['c_x']
+            self.edit_cx = c_x
 
         self.edit_stiffness_cy_entry.delete(0, tk.END)
-        self.edit_stiffness_cy_entry.insert(0, f"{support['c_y']}")
-        if support['c_y'] == '∞':
+        self.edit_stiffness_cy_entry.insert(0, f"{c_y}")
+        if c_y == '∞':
             self.edit_stiffness_cy_entry.configure(state='readonly')
             self.edit_support_rigid_cy_state.set(True)
         else:
             self.edit_stiffness_cy_entry.configure(state='normal')
             self.edit_support_rigid_cy_state.set(False)
-            self.edit_cy = support['c_y']
+            self.edit_cy = c_y
 
         self.toggle_edit_stiffness_cx()
         self.toggle_edit_stiffness_cy()
@@ -2095,8 +2280,8 @@ class TrussAnalysisApp(tk.Tk):
         try:
             selected_index = self.support_dropdown.current()
             support_id = list(self.input_supports.keys())[selected_index]
-            # Parse values from entry boxes
-            support_node = self.parse_coordinates(self.edit_support_node_entry.get())
+            # Parse the coordinates from the entry fields
+            support_node = self.get_selected_node(self.edit_support_node_entry)
             if self.edit_stiffness_cx_entry.get():
                 if self.edit_stiffness_cx_entry.get() != '∞':
                     if float(self.edit_stiffness_cx_entry.get()) < 0:
@@ -2171,6 +2356,8 @@ class TrussAnalysisApp(tk.Tk):
             new_input_supports[str(i)]['sup_number'] = i
 
         self.input_supports = new_input_supports
+        if self.input_supports == {}:
+            self.edit_support_button.config(state='disabled')
         # Update information window
         self.update_system_information()
         # Draw elements, supports and loads on canvas
@@ -2310,6 +2497,9 @@ class TrussAnalysisApp(tk.Tk):
         self.export_plot.config(state='disabled')
         self.plot_nonlinear_deformation.config(state='disabled')
         self.plot_nonlinear_forces.config(state='disabled')
+        self.edit_element_button.config(state='disabled')
+        self.edit_load_button.config(state='disabled')
+        self.edit_support_button.config(state='disabled')
         self.num_iterations_entry.delete(0, tk.END)
         self.delta_f_entry.delete(0, tk.END)
         self.method_combobox.current(0)
@@ -2349,6 +2539,7 @@ class TrussAnalysisApp(tk.Tk):
             if 'input_elements' in data:
                 self.add_element_initialise = 1
                 self.ele_number = 0
+                self.edit_element_button.config(state='normal')
                 for key, element in data['input_elements'].items():
                     self.ele_number += 1
                     if 'ele_node_i' in element:
@@ -2359,6 +2550,7 @@ class TrussAnalysisApp(tk.Tk):
             if 'input_supports' in data:
                 self.add_support_initialise = 1
                 self.support_number = 0
+                self.edit_support_button.config(state='normal')
                 for key, support in data['input_supports'].items():
                     self.support_number += 1
                     if 'sup_node' in support:
@@ -2367,6 +2559,7 @@ class TrussAnalysisApp(tk.Tk):
             if 'input_forces' in data:
                 self.add_load_initialise = 1
                 self.force_number = 0
+                self.edit_load_button.config(state='normal')
                 for key, force in data['input_forces'].items():
                     self.force_number += 1
                     if 'force_node' in force:
