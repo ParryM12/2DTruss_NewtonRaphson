@@ -1538,6 +1538,8 @@ class TrussAnalysisApp(tk.Tk):
             self.toggle_loads()
             self.toggle_node_labels()
             self.update_node_comboboxes()
+            self.element_type_state.set(False)
+            self.toggle_element_type()
 
         except Exception as e:
             # Show a warning message box
