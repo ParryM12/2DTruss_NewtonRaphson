@@ -229,7 +229,9 @@ class TrussAnalysisApp(tk.Tk):
         separator1.pack(fill='x', padx=10, pady=5)
         ##############
         # Calculation button
-        ttk.Button(main_frame, text="Run Calculation", command=self.run_calculation).pack(pady=10)
+        self.run_calculation_button = ttk.Button(main_frame, text="Run Calculation", command=self.run_calculation,
+                                                 state='disabled')
+        self.run_calculation_button.pack(pady=10)
         separator1 = ttk.Separator(main_frame, orient='horizontal')
         separator1.pack(fill='x', padx=10, pady=5)
 
@@ -405,6 +407,12 @@ class TrussAnalysisApp(tk.Tk):
         self.canvas.create_line(start_x, start_y, start_x, start_y + arrow_length, arrow=tk.LAST)
         self.canvas.create_text(start_x + 12, start_y + arrow_length - 8, text="y", anchor="center", width=1.5,
                                 font=GUI_Settings.ITALIC_FONT_1)
+
+    def toggle_run_calculation_button(self):
+        if self.add_element_initialise == 1 and self.add_load_initialise == 1 and self.add_support_initialise == 1:
+            self.run_calculation_button.config(state='normal')
+        else:
+            self.run_calculation_button.config(state='disabled')
 
     def draw_grid(self):
         canvas_width = self.canvas.winfo_width()
@@ -999,6 +1007,7 @@ class TrussAnalysisApp(tk.Tk):
             self.canvas.delete("header")
 
     def label_nodes(self):
+        self.nodes = []
         for element in self.input_elements.values():
             # Check and add nodes to the list if they are not already in it
             if element['ele_node_i'] not in self.nodes:
@@ -1056,6 +1065,7 @@ class TrussAnalysisApp(tk.Tk):
         # self.draw_load()
         self.toggle_loads()
         self.toggle_node_labels()
+        self.toggle_element_labels()
 
         # Deformation scale factor and max displacements
         max_displacement = np.max(abs(displacement))
@@ -1199,6 +1209,7 @@ class TrussAnalysisApp(tk.Tk):
         self.toggle_loads()
         self.draw_reaction_forces(reactions)
         self.toggle_node_labels()
+        self.toggle_element_labels()
 
     def add_elements_form(self, parent_frame):
         # Create Frame
@@ -1321,8 +1332,8 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_support_button.grid(row=5, column=0, pady=7, padx=17, sticky='ew')
 
         # Create Button to add the support
-        ttk.Button(frame, text="Add Support", command=self.add_support).grid(row=5, column=1, pady=7, padx=10,
-                                                                             sticky='ew')
+        self.add_support_button = ttk.Button(frame, text="Add Support", command=self.add_support, state='disabled')
+        self.add_support_button.grid(row=5, column=1, pady=7, padx=10, sticky='ew')
 
     def toggle_stiffness_cx(self):
         if self.support_rigid_cx_state.get():
@@ -1372,8 +1383,8 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_load_button = ttk.Button(frame, text="Edit/Delete Load", command=self.edit_load, state='disabled')
         self.edit_load_button.grid(row=3, column=0, pady=7, padx=17, sticky='ew')
         # Create Button to add the load
-        ttk.Button(frame, text="Add Load", command=self.add_load).grid(row=3, column=1, pady=7, padx=10,
-                                                                       sticky='ew')
+        self.add_load_button = ttk.Button(frame, text="Add Load", command=self.add_load, state='disabled')
+        self.add_load_button.grid(row=3, column=1, pady=7, padx=10, sticky='ew')
 
     def calculation_settings_form(self, parent_frame):
         # Create Frame
@@ -1409,6 +1420,7 @@ class TrussAnalysisApp(tk.Tk):
     def update_node_comboboxes(self):
         self.node_label_to_value_map = {}
         self.node_value_to_index_map = {}
+        self.nodes = []
         for element in self.input_elements.values():
             # Check and add nodes to the list if they are not already in it
             if element['ele_node_i'] not in self.nodes:
@@ -1531,15 +1543,19 @@ class TrussAnalysisApp(tk.Tk):
             self.plot_button.config(state='normal')
             # Create grid, if selected
             self.edit_element_button.config(state='normal')
+            self.add_support_button.config(state='normal')
+            self.add_load_button.config(state='normal')
             self.toggle_grid()
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.toggle_element_labels()
             self.update_node_comboboxes()
             self.element_type_state.set(False)
             self.toggle_element_type()
+            self.toggle_run_calculation_button()
 
         except Exception as e:
             # Show a warning message box
@@ -1772,20 +1788,54 @@ class TrussAnalysisApp(tk.Tk):
                 'ele_lin_coeff': lin_coeff,
                 'ele_quad_coeff': quad_coeff,
                 'ele_eps_f': strain_entry}
-            # Update information window
-            self.update_system_information()
             # Draw elements, supports and loads on canvas
             self.canvas.delete("all")  # Clear the canvas
-            # Create grid, if selected
+            # Update Nodes
+            self.update_node_comboboxes()
+            # Check Supports
+            input_supports = copy.deepcopy(self.input_supports)
+            for key, support in self.input_supports.items():
+                if support['sup_node'] not in self.nodes:
+                    del input_supports[key]
+            self.input_supports = copy.deepcopy(input_supports)
+            # Renumbering the remaining supports
+            new_input_supports = {}
+            for i, key in enumerate(sorted(self.input_supports.keys())):
+                new_input_supports[str(i)] = self.input_supports[key]
+                new_input_supports[str(i)]['sup_number'] = i
+            self.input_supports = new_input_supports
+            # Disable edit button if no supports are defined
+            if self.input_supports == {}:
+                self.add_support_initialise = 0
+                self.edit_support_button.config(state='disabled')
+            # Check Loads
+            input_forces = copy.deepcopy(self.input_forces)
+            for key, force in self.input_forces.items():
+                if force['force_node'] not in self.nodes:
+                    del input_forces[key]
+            self.input_forces = copy.deepcopy(input_forces)
+            # Renumbering the remaining Loads
+            new_input_forces = {}
+            for i, key in enumerate(sorted(self.input_forces.keys())):
+                new_input_forces[str(i)] = self.input_forces[key]
+                new_input_forces[str(i)]['force_number'] = i
+            self.input_forces = new_input_forces
+            # Disable edit button if no loads are defined
+            if self.input_forces == {}:
+                self.add_load_initialise = 0
+                self.edit_load_button.config(state='disabled')
+            # Draw everything
             self.toggle_grid()
             self.draw_coordinate_system()
             self.draw_element()
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
-            self.update_node_comboboxes()
+            self.toggle_element_labels()
             # Close window
             self.edit_window.destroy()
+            # Update information window
+            self.update_system_information()
         except Exception as e:
             # Show a warning message box
             messagebox.showerror("Error", f"An error occurred while adding the element: {e}")
@@ -1820,6 +1870,8 @@ class TrussAnalysisApp(tk.Tk):
         if self.input_elements == {}:
             self.add_element_initialise = 0
             self.edit_element_button.config(state='disabled')
+            self.add_load_button.config(state='disabled')
+            self.add_support_button.config(state='disabled')
         # Check if loads or supports are located at the deleted nodes
         # Update global nodes
         self.nodes = []
@@ -1874,7 +1926,9 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_support('black', None)
         self.toggle_loads()
         self.toggle_node_labels()
+        self.toggle_element_labels()
         self.update_node_comboboxes()
+        self.toggle_run_calculation_button()
         # Update the combobox options and entry fields
         self.update_element_dropdown()
 
@@ -1927,6 +1981,8 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.toggle_element_labels()
+            self.toggle_run_calculation_button()
         except Exception as e:
             # Show a warning message box
             messagebox.showerror("Error", f"An error occurred while adding the load: {e}")
@@ -2034,6 +2090,7 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.toggle_element_labels()
             # Close window
             self.edit_window_load.destroy()
         except Exception as e:
@@ -2069,6 +2126,7 @@ class TrussAnalysisApp(tk.Tk):
         self.input_forces = new_input_loads
         if self.input_forces == {}:
             self.edit_load_button.config(state='disabled')
+            self.add_load_initialise = 0
         # Update information window
         self.update_system_information()
         # Draw elements, supports and loads on canvas
@@ -2079,6 +2137,8 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_support('black', None)
         self.toggle_loads()
         self.toggle_node_labels()
+        self.toggle_element_labels()
+        self.toggle_run_calculation_button()
         # Update the combobox options and entry fields
         self.update_load_dropdown()
 
@@ -2116,7 +2176,7 @@ class TrussAnalysisApp(tk.Tk):
                 c_y = 0
 
             # Check for duplicate support
-            if self.add_load_initialise == 1:
+            if self.add_support_initialise == 1:
                 for key, support in self.input_supports.items():
                     if support['sup_node'] == support_node:
                         messagebox.showerror("Duplicate Support", "A support with this node already exists!"
@@ -2148,6 +2208,8 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.toggle_element_labels()
+            self.toggle_run_calculation_button()
 
         except Exception as e:
             # Show a warning message box
@@ -2321,6 +2383,7 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.toggle_element_labels()
             # Close window
             self.edit_window_support.destroy()
         except Exception as e:
@@ -2356,6 +2419,7 @@ class TrussAnalysisApp(tk.Tk):
         self.input_supports = new_input_supports
         if self.input_supports == {}:
             self.edit_support_button.config(state='disabled')
+            self.add_support_initialise = 0
         # Update information window
         self.update_system_information()
         # Draw elements, supports and loads on canvas
@@ -2365,7 +2429,9 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_element()
         self.draw_support('black', None)
         self.toggle_loads()
+        self.toggle_run_calculation_button()
         self.toggle_node_labels()
+        self.toggle_element_labels()
         # Update the combobox options and entry fields
         self.update_support_dropdown()
 
@@ -2498,6 +2564,8 @@ class TrussAnalysisApp(tk.Tk):
         self.edit_element_button.config(state='disabled')
         self.edit_load_button.config(state='disabled')
         self.edit_support_button.config(state='disabled')
+        self.add_load_button.config(state='disabled')
+        self.add_support_button.config(state='disabled')
         self.num_iterations_entry.delete(0, tk.END)
         self.delta_f_entry.delete(0, tk.END)
         self.method_combobox.current(0)
@@ -2512,6 +2580,7 @@ class TrussAnalysisApp(tk.Tk):
         self.update_calculation_information()
         self.toggle_grid()
         self.update_node_comboboxes()
+        self.toggle_run_calculation_button()
 
     def save_to_file(self):
         data = {
@@ -2538,6 +2607,8 @@ class TrussAnalysisApp(tk.Tk):
                 self.add_element_initialise = 1
                 self.ele_number = 0
                 self.edit_element_button.config(state='normal')
+                self.add_support_button.config(state='normal')
+                self.add_load_button.config(state='normal')
                 for key, element in data['input_elements'].items():
                     self.ele_number += 1
                     if 'ele_node_i' in element:
@@ -2587,7 +2658,9 @@ class TrussAnalysisApp(tk.Tk):
             self.draw_support('black', None)
             self.toggle_loads()
             self.toggle_node_labels()
+            self.toggle_element_labels()
             self.update_node_comboboxes()
+            self.toggle_run_calculation_button()
 
     def plot_system(self):
         # Clear existing canvas
@@ -2600,6 +2673,7 @@ class TrussAnalysisApp(tk.Tk):
         self.draw_support('black', None)
         self.toggle_loads()
         self.toggle_node_labels()
+        self.toggle_element_labels()
 
 
 # Run the application
